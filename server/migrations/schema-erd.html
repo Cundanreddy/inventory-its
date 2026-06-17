@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ITS — Database Schema ERD</title>
+<style>
+:root {
+  --bg:#0f1117; --surface:#181c27; --surface2:#1e2335; --border:#2a3050;
+  --accent:#4f7cff; --green:#22c55e; --yellow:#f59e0b; --red:#ef4444;
+  --purple:#a78bfa; --cyan:#22d3ee; --pink:#f472b6;
+  --text:#e2e8f0; --muted:#8892a4;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* Top bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;gap:12px;flex-wrap:wrap}
+.topbar h1{font-size:14px;font-weight:700;color:var(--accent);letter-spacing:.05em}
+.topbar p{font-size:11px;color:var(--muted)}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{padding:5px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);color:var(--text);cursor:pointer;font-size:12px;font-weight:600;transition:all .15s}
+.btn:hover,.btn.active{background:var(--accent);border-color:var(--accent)}
+.zoom-label{font-size:12px;color:var(--muted);min-width:36px;text-align:center}
+
+/* Canvas area */
+.canvas-wrap{flex:1;overflow:hidden;position:relative;cursor:grab}
+.canvas-wrap:active{cursor:grabbing}
+#canvas{position:absolute;transform-origin:0 0}
+
+/* Table card */
+.tbl{position:absolute;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;min-width:220px;box-shadow:0 4px 24px rgba(0,0,0,.4);transition:box-shadow .2s;cursor:default;user-select:none}
+.tbl:hover{box-shadow:0 6px 32px rgba(79,124,255,.25);border-color:#3a4a80;z-index:10}
+.tbl-head{padding:10px 14px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:8px}
+.tbl-icon{font-size:14px}
+.tbl-name{font-size:13px;font-weight:700;letter-spacing:.02em}
+.tbl-badge{font-size:10px;padding:2px 7px;border-radius:99px;font-weight:600;margin-left:auto}
+.tbl-body{padding:0}
+.col-row{display:flex;align-items:center;gap:6px;padding:5px 14px;border-top:1px solid rgba(255,255,255,.04);font-size:11.5px}
+.col-row:last-child{border-radius:0 0 10px 10px}
+.col-row:hover{background:rgba(255,255,255,.03)}
+.col-key{font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700;flex-shrink:0}
+.pk{background:#4f7cff22;color:var(--accent)}
+.fk{background:#a78bfa22;color:var(--purple)}
+.col-name{font-weight:600;color:var(--text);flex:1}
+.col-type{color:var(--muted);font-size:10.5px;text-align:right}
+.col-null{font-size:9px;color:#4a5568;margin-left:4px}
+
+/* SVG lines */
+#lines{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.fk-line{stroke:#4f7cff;stroke-width:1.5;fill:none;opacity:.5;marker-end:url(#arrow)}
+
+/* Detail panel */
+.detail{position:fixed;right:0;top:0;bottom:0;width:320px;background:var(--surface);border-left:1px solid var(--border);padding:20px;overflow-y:auto;transform:translateX(100%);transition:transform .25s;z-index:100}
+.detail.open{transform:translateX(0)}
+.detail h2{font-size:15px;font-weight:700;margin-bottom:4px}
+.detail .sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.detail-col{padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.detail-col:last-child{border:none}
+.detail-col .dc-name{font-weight:700;margin-bottom:2px}
+.detail-col .dc-meta{color:var(--muted);font-size:11px;line-height:1.6}
+.close-btn{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px}
+
+/* Legend */
+.legend{position:fixed;left:12px;bottom:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px;display:flex;gap:14px;align-items:center}
+.leg-item{display:flex;align-items:center;gap:5px}
+.leg-dot{width:10px;height:10px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>🗄 Database Schema — Inventory Tracking System</h1>
+    <p>12 tables · click any table for column details · drag to pan</p>
+  </div>
+  <div class="controls">
+    <button class="btn" onclick="zoom(-0.1)">− Zoom</button>
+    <span class="zoom-label" id="zlabel">100%</span>
+    <button class="btn" onclick="zoom(0.1)">+ Zoom</button>
+    <button class="btn" onclick="resetView()">Reset View</button>
+    <button class="btn" id="fk-toggle" onclick="toggleFKLines()">Hide Relations</button>
+  </div>
+</div>
+
+<div class="canvas-wrap" id="wrap">
+  <div id="canvas">
+    <svg id="lines">
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#4f7cff" opacity=".7"/>
+        </marker>
+      </defs>
+    </svg>
+  </div>
+</div>
+
+<div class="detail" id="detail">
+  <button class="close-btn" onclick="closeDetail()">✕</button>
+  <h2 id="d-title"></h2>
+  <div class="sub" id="d-sub"></div>
+  <div id="d-cols"></div>
+</div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#4f7cff22;border:1px solid #4f7cff"></div> PK</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#a78bfa22;border:1px solid #a78bfa"></div> FK</div>
+  <div class="leg-item"><div class="leg-dot" style="background:var(--border)"></div> Column</div>
+  <span style="color:var(--muted)">── FK relation</span>
+</div>
+
+<script>
+const TABLES = [
+  {
+    id:'users', name:'users', icon:'👤', color:'#4f7cff', desc:'User accounts, roles, auth state',
+    pos:{x:60,y:60},
+    cols:[
+      {n:'id',          t:'uuid',        pk:true,  nn:true,  note:'Primary key, auto UUID'},
+      {n:'name',        t:'varchar(100)',           nn:true,  note:'Full name'},
+      {n:'email',       t:'varchar(150)',           nn:true,  note:'Unique login email'},
+      {n:'password_hash',t:'varchar(255)',          nn:true,  note:'bcrypt hash, cost 12'},
+      {n:'role',        t:'enum',                  nn:true,  note:'admin | staff | auditor'},
+      {n:'phone',       t:'varchar(20)',                      note:'Optional contact phone'},
+      {n:'department',  t:'varchar(100)',                     note:'Office department'},
+      {n:'is_active',   t:'boolean',               nn:true,  note:'Soft disable login'},
+      {n:'last_login_at',t:'timestamp',                       note:'Last successful login'},
+      {n:'failed_login_attempts',t:'int',          nn:true,  note:'Brute-force counter'},
+      {n:'locked_until',t:'timestamp',                        note:'Account lockout expiry'},
+      {n:'created_at',  t:'timestamp',             nn:true},
+      {n:'updated_at',  t:'timestamp',             nn:true},
+    ]
+  },
+  {
+    id:'categories', name:'categories', icon:'🏷', color:'#22c55e', desc:'Asset and consumable classification',
+    pos:{x:400,y:60},
+    cols:[
+      {n:'id',          t:'uuid',    pk:true, nn:true},
+      {n:'name',        t:'varchar(100)',     nn:true, note:'Category label'},
+      {n:'type',        t:'enum',            nn:true, note:'asset | consumable'},
+      {n:'description', t:'text'},
+      {n:'is_active',   t:'boolean',         nn:true},
+      {n:'created_at',  t:'timestamp',       nn:true},
+      {n:'updated_at',  t:'timestamp',       nn:true},
+    ]
+  },
+  {
+    id:'locations', name:'locations', icon:'📍', color:'#22c55e', desc:'Physical storage locations (building > room)',
+    pos:{x:700,y:60},
+    cols:[
+      {n:'id',       t:'uuid',        pk:true, nn:true},
+      {n:'building', t:'varchar(100)',         nn:true, note:'e.g. Main Office'},
+      {n:'room',     t:'varchar(100)',         nn:true, note:'e.g. IT Storage Room'},
+      {n:'notes',    t:'text'},
+      {n:'is_active',t:'boolean',             nn:true},
+      {n:'created_at',t:'timestamp',          nn:true},
+      {n:'updated_at',t:'timestamp',          nn:true},
+    ]
+  },
+  {
+    id:'suppliers', name:'suppliers', icon:'🚚', color:'#f59e0b', desc:'Vendor / supplier directory',
+    pos:{x:1000,y:60},
+    cols:[
+      {n:'id',             t:'uuid',        pk:true, nn:true},
+      {n:'name',           t:'varchar(150)',         nn:true, note:'Unique supplier name'},
+      {n:'contact_person', t:'varchar(100)'},
+      {n:'email',          t:'varchar(150)'},
+      {n:'phone',          t:'varchar(30)'},
+      {n:'address',        t:'text'},
+      {n:'website',        t:'varchar(255)'},
+      {n:'notes',          t:'text'},
+      {n:'is_active',      t:'boolean',             nn:true},
+      {n:'created_at',     t:'timestamp',           nn:true},
+      {n:'updated_at',     t:'timestamp',           nn:true},
+    ]
+  },
+  {
+    id:'assets', name:'assets', icon:'📦', color:'#4f7cff', desc:'Individual trackable hardware items',
+    pos:{x:60,y:380},
+    cols:[
+      {n:'id',              t:'uuid',        pk:true,  nn:true},
+      {n:'name',            t:'varchar(150)',          nn:true},
+      {n:'asset_tag',       t:'varchar(50)',                    note:'e.g. IT-0042, unique'},
+      {n:'serial_number',   t:'varchar(100)',                   note:'Manufacturer serial, unique'},
+      {n:'brand',           t:'varchar(100)'},
+      {n:'model',           t:'varchar(100)'},
+      {n:'category_id',     t:'uuid', fk:'categories', nn:true},
+      {n:'location_id',     t:'uuid', fk:'locations'},
+      {n:'supplier_id',     t:'uuid', fk:'suppliers'},
+      {n:'purchase_date',   t:'date'},
+      {n:'purchase_price',  t:'decimal(12,2)'},
+      {n:'invoice_number',  t:'varchar(100)'},
+      {n:'warranty_expiry', t:'date'},
+      {n:'status',          t:'enum',                 nn:true,  note:'available|assigned|maintenance|retired|lost|disposed'},
+      {n:'assigned_to',     t:'uuid', fk:'users'},
+      {n:'assigned_since',  t:'date'},
+      {n:'next_maintenance_date', t:'date'},
+      {n:'maintenance_interval_days', t:'int'},
+      {n:'photo_url',       t:'varchar(500)'},
+      {n:'notes',           t:'text'},
+      {n:'is_active',       t:'boolean',              nn:true},
+      {n:'created_at',      t:'timestamp',            nn:true},
+      {n:'updated_at',      t:'timestamp',            nn:true},
+    ]
+  },
+  {
+    id:'consumables', name:'consumables', icon:'📋', color:'#22d3ee', desc:'Stock items tracked by quantity',
+    pos:{x:420,y:380},
+    cols:[
+      {n:'id',             t:'uuid',        pk:true, nn:true},
+      {n:'sku',            t:'varchar(80)',          nn:true, note:'Unique stock code'},
+      {n:'name',           t:'varchar(150)',         nn:true},
+      {n:'description',    t:'text'},
+      {n:'category_id',    t:'uuid', fk:'categories', nn:true},
+      {n:'location_id',    t:'uuid', fk:'locations'},
+      {n:'supplier_id',    t:'uuid', fk:'suppliers'},
+      {n:'quantity',       t:'int',                 nn:true, note:'Current stock level'},
+      {n:'min_threshold',  t:'int',                 nn:true, note:'Low-stock alert trigger'},
+      {n:'reorder_quantity',t:'int'},
+      {n:'unit',           t:'varchar(50)',          nn:true, note:'pcs / boxes / reams…'},
+      {n:'unit_cost',      t:'decimal(10,2)'},
+      {n:'expiry_date',    t:'date'},
+      {n:'photo_url',      t:'varchar(500)'},
+      {n:'notes',          t:'text'},
+      {n:'is_active',      t:'boolean',             nn:true},
+      {n:'created_at',     t:'timestamp',           nn:true},
+      {n:'updated_at',     t:'timestamp',           nn:true},
+    ]
+  },
+  {
+    id:'assignments', name:'assignments', icon:'🔄', color:'#a78bfa', desc:'Asset checkout / check-in lifecycle',
+    pos:{x:780,y:380},
+    cols:[
+      {n:'id',               t:'uuid',   pk:true, nn:true},
+      {n:'asset_id',         t:'uuid', fk:'assets',  nn:true},
+      {n:'user_id',          t:'uuid', fk:'users',   nn:true, note:'Borrower'},
+      {n:'status',           t:'enum',               nn:true, note:'pending|approved|rejected|returned|overdue'},
+      {n:'requested_at',     t:'timestamp',          nn:true},
+      {n:'approved_at',      t:'timestamp'},
+      {n:'rejected_at',      t:'timestamp'},
+      {n:'checked_out_at',   t:'timestamp'},
+      {n:'expected_return',  t:'date'},
+      {n:'returned_at',      t:'timestamp'},
+      {n:'approved_by',      t:'uuid', fk:'users'},
+      {n:'request_reason',   t:'text'},
+      {n:'rejection_reason', t:'text'},
+      {n:'return_notes',     t:'text'},
+      {n:'return_condition', t:'enum',                         note:'good|damaged|lost'},
+      {n:'created_at',       t:'timestamp',          nn:true},
+      {n:'updated_at',       t:'timestamp',          nn:true},
+    ]
+  },
+  {
+    id:'stock_transactions', name:'stock_transactions', icon:'📊', color:'#22d3ee', desc:'Immutable consumable stock ledger',
+    pos:{x:60,y:740},
+    cols:[
+      {n:'id',                t:'uuid',    pk:true,  nn:true},
+      {n:'consumable_id',     t:'uuid', fk:'consumables', nn:true},
+      {n:'type',              t:'enum',              nn:true, note:'add|issue|adjustment|return|disposal'},
+      {n:'quantity',          t:'int',               nn:true, note:'+ve or −ve delta'},
+      {n:'quantity_before',   t:'int',               nn:true, note:'Snapshot before txn'},
+      {n:'quantity_after',    t:'int',               nn:true, note:'Snapshot after txn'},
+      {n:'transacted_by',     t:'uuid', fk:'users', nn:true},
+      {n:'recipient',         t:'varchar(150)'},
+      {n:'department',        t:'varchar(100)'},
+      {n:'invoice_number',    t:'varchar(100)'},
+      {n:'unit_cost_at_time', t:'decimal(10,2)'},
+      {n:'supplier_id',       t:'uuid', fk:'suppliers'},
+      {n:'notes',             t:'text'},
+      {n:'transacted_at',     t:'timestamp',         nn:true},
+    ]
+  },
+  {
+    id:'maintenance_logs', name:'maintenance_logs', icon:'🔧', color:'#f59e0b', desc:'Asset repair and service history',
+    pos:{x:430,y:740},
+    cols:[
+      {n:'id',                  t:'uuid',   pk:true, nn:true},
+      {n:'asset_id',            t:'uuid', fk:'assets', nn:true},
+      {n:'type',                t:'enum',             nn:true, note:'repair|preventive|inspection|upgrade|calibration'},
+      {n:'status',              t:'enum',             nn:true, note:'scheduled|in_progress|completed|cancelled'},
+      {n:'scheduled_date',      t:'date'},
+      {n:'completed_date',      t:'date'},
+      {n:'performed_by',        t:'varchar(150)'},
+      {n:'vendor_id',           t:'uuid', fk:'suppliers'},
+      {n:'description',         t:'text'},
+      {n:'findings',            t:'text'},
+      {n:'cost',                t:'decimal(10,2)'},
+      {n:'invoice_number',      t:'varchar(100)'},
+      {n:'next_maintenance_date',t:'date'},
+      {n:'logged_by',           t:'uuid', fk:'users', nn:true},
+      {n:'created_at',          t:'timestamp',        nn:true},
+      {n:'updated_at',          t:'timestamp',        nn:true},
+    ]
+  },
+  {
+    id:'audit_logs', name:'audit_logs', icon:'📝', color:'#ef4444', desc:'Immutable action history — append only',
+    pos:{x:800,y:740},
+    cols:[
+      {n:'id',           t:'uuid',   pk:true, nn:true},
+      {n:'user_id',      t:'uuid', fk:'users'},
+      {n:'user_email',   t:'varchar(150)',       note:'Snapshot, survives user deletion'},
+      {n:'user_role',    t:'varchar(50)'},
+      {n:'action',       t:'enum',    nn:true,   note:'CREATE|UPDATE|DELETE|LOGIN etc.'},
+      {n:'entity_type',  t:'varchar(50)',nn:true, note:'asset|consumable|user…'},
+      {n:'entity_id',    t:'uuid'},
+      {n:'before_value', t:'jsonb',              note:'State before change'},
+      {n:'after_value',  t:'jsonb',              note:'State after change'},
+      {n:'ip_address',   t:'varchar(45)'},
+      {n:'user_agent',   t:'text'},
+      {n:'notes',        t:'text'},
+      {n:'created_at',   t:'timestamp', nn:true},
+    ]
+  },
+  {
+    id:'notifications', name:'notifications', icon:'🔔', color:'#f472b6', desc:'In-app notification inbox',
+    pos:{x:1100,y:480},
+    cols:[
+      {n:'id',          t:'uuid',   pk:true, nn:true},
+      {n:'user_id',     t:'uuid', fk:'users',          note:'null = all admins'},
+      {n:'type',        t:'enum',    nn:true,           note:'low_stock|warranty_expiry|…'},
+      {n:'title',       t:'varchar(200)', nn:true},
+      {n:'message',     t:'text',    nn:true},
+      {n:'entity_type', t:'varchar(50)'},
+      {n:'entity_id',   t:'uuid'},
+      {n:'is_read',     t:'boolean', nn:true},
+      {n:'read_at',     t:'timestamp'},
+      {n:'created_at',  t:'timestamp', nn:true},
+    ]
+  },
+  {
+    id:'software_licenses', name:'software_licenses', icon:'💿', color:'#22c55e', desc:'Software license tracking with seat counts',
+    pos:{x:1100,y:740},
+    cols:[
+      {n:'id',            t:'uuid',   pk:true, nn:true},
+      {n:'software_name', t:'varchar(150)',    nn:true},
+      {n:'version',       t:'varchar(50)'},
+      {n:'license_key',   t:'varchar(500)',              note:'Encrypted in app layer'},
+      {n:'license_type',  t:'enum',           nn:true,  note:'perpetual|subscription|oem|…'},
+      {n:'total_seats',   t:'int',                       note:'null = unlimited'},
+      {n:'used_seats',    t:'int',            nn:true},
+      {n:'supplier_id',   t:'uuid', fk:'suppliers'},
+      {n:'purchase_date', t:'date'},
+      {n:'expiry_date',   t:'date'},
+      {n:'cost',          t:'decimal(10,2)'},
+      {n:'invoice_number',t:'varchar(100)'},
+      {n:'status',        t:'enum',           nn:true,  note:'active|expired|cancelled'},
+      {n:'notes',         t:'text'},
+      {n:'created_at',    t:'timestamp',      nn:true},
+      {n:'updated_at',    t:'timestamp',      nn:true},
+    ]
+  },
+];
+
+// FK relations [from_table, fk_col, to_table]
+const RELATIONS = [
+  ['assets','category_id','categories'],
+  ['assets','location_id','locations'],
+  ['assets','supplier_id','suppliers'],
+  ['assets','assigned_to','users'],
+  ['consumables','category_id','categories'],
+  ['consumables','location_id','locations'],
+  ['consumables','supplier_id','suppliers'],
+  ['assignments','asset_id','assets'],
+  ['assignments','user_id','users'],
+  ['assignments','approved_by','users'],
+  ['stock_transactions','consumable_id','consumables'],
+  ['stock_transactions','transacted_by','users'],
+  ['stock_transactions','supplier_id','suppliers'],
+  ['maintenance_logs','asset_id','assets'],
+  ['maintenance_logs','vendor_id','suppliers'],
+  ['maintenance_logs','logged_by','users'],
+  ['audit_logs','user_id','users'],
+  ['notifications','user_id','users'],
+  ['software_licenses','supplier_id','suppliers'],
+];
+
+// ── Layout engine ──
+let scale = 1, panX = 20, panY = 20;
+let dragging = false, dragStart = {x:0,y:0}, panStart = {x:0,y:0};
+let showFKLines = true;
+const tableEls = {};
+const tablePositions = {};
+
+function render() {
+  const canvas = document.getElementById('canvas');
+  canvas.innerHTML = '<svg id="lines"><defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#4f7cff" opacity=".7"/></marker></defs></svg>';
+
+  TABLES.forEach(tbl => {
+    const el = document.createElement('div');
+    el.className = 'tbl';
+    el.id = 'tbl_' + tbl.id;
+    el.style.left = tbl.pos.x + 'px';
+    el.style.top  = tbl.pos.y + 'px';
+
+    const visibleCols = tbl.cols.slice(0, 12); // show first 12 columns
+    const more = tbl.cols.length - visibleCols.length;
+
+    el.innerHTML = `
+      <div class="tbl-head" style="background:${tbl.color}18;border-bottom:1px solid ${tbl.color}33">
+        <span class="tbl-icon">${tbl.icon}</span>
+        <span class="tbl-name" style="color:${tbl.color}">${tbl.name}</span>
+        <span class="tbl-badge" style="background:${tbl.color}22;color:${tbl.color}">${tbl.cols.length} cols</span>
+      </div>
+      <div class="tbl-body">
+        ${visibleCols.map(c => `
+          <div class="col-row">
+            ${c.pk ? '<span class="col-key pk">PK</span>' : c.fk ? '<span class="col-key fk">FK</span>' : '<span style="width:18px"></span>'}
+            <span class="col-name">${c.n}</span>
+            <span class="col-type">${c.t}</span>
+            ${c.nn ? '' : '<span class="col-null">?</span>'}
+          </div>`).join('')}
+        ${more > 0 ? `<div class="col-row" style="color:var(--muted);font-style:italic">+${more} more columns…</div>` : ''}
+      </div>`;
+
+    el.addEventListener('click', () => openDetail(tbl));
+    makeDraggable(el, tbl);
+    canvas.appendChild(el);
+    tableEls[tbl.id] = el;
+    tablePositions[tbl.id] = { ...tbl.pos };
+  });
+
+  updateCanvas();
+  if (showFKLines) drawLines();
+}
+
+function makeDraggable(el, tbl) {
+  let dx, dy, moving = false;
+  el.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    moving = true;
+    dx = e.clientX / scale - tbl.pos.x;
+    dy = e.clientY / scale - tbl.pos.y;
+    el.style.zIndex = 20;
+  });
+  window.addEventListener('mousemove', e => {
+    if (!moving) return;
+    tbl.pos.x = e.clientX / scale - dx;
+    tbl.pos.y = e.clientY / scale - dy;
+    el.style.left = tbl.pos.x + 'px';
+    el.style.top  = tbl.pos.y + 'px';
+    tablePositions[tbl.id] = { ...tbl.pos };
+    if (showFKLines) drawLines();
+  });
+  window.addEventListener('mouseup', () => { moving = false; el.style.zIndex = ''; });
+}
+
+function drawLines() {
+  const svg = document.getElementById('lines');
+  svg.querySelectorAll('.fk-line').forEach(l => l.remove());
+  if (!showFKLines) return;
+
+  RELATIONS.forEach(([from, col, to]) => {
+    const fEl = document.getElementById('tbl_' + from);
+    const tEl = document.getElementById('tbl_' + to);
+    if (!fEl || !tEl) return;
+
+    const fr = { x: parseFloat(fEl.style.left) + fEl.offsetWidth, y: parseFloat(fEl.style.top) + 30 };
+    const tr = { x: parseFloat(tEl.style.left), y: parseFloat(tEl.style.top) + 30 };
+
+    const mx = (fr.x + tr.x) / 2;
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('class','fk-line');
+    path.setAttribute('d', `M${fr.x},${fr.y} C${mx},${fr.y} ${mx},${tr.y} ${tr.x},${tr.y}`);
+    path.setAttribute('marker-end','url(#arrow)');
+    svg.appendChild(path);
+  });
+}
+
+function updateCanvas() {
+  const canvas = document.getElementById('canvas');
+  canvas.style.transform = `translate(${panX}px,${panY}px) scale(${scale})`;
+  document.getElementById('zlabel').textContent = Math.round(scale*100) + '%';
+}
+
+function zoom(delta) {
+  scale = Math.max(0.3, Math.min(2, scale + delta));
+  updateCanvas();
+}
+
+function resetView() {
+  scale = 0.75; panX = 20; panY = 20;
+  updateCanvas();
+}
+
+function toggleFKLines() {
+  showFKLines = !showFKLines;
+  const btn = document.getElementById('fk-toggle');
+  btn.textContent = showFKLines ? 'Hide Relations' : 'Show Relations';
+  btn.classList.toggle('active', !showFKLines);
+  drawLines();
+}
+
+// Pan canvas
+const wrap = document.getElementById('wrap');
+wrap.addEventListener('mousedown', e => {
+  if (e.target !== wrap && e.target !== document.getElementById('canvas') && e.target.tagName !== 'svg' && e.target.tagName !== 'path') return;
+  dragging = true;
+  dragStart = { x: e.clientX, y: e.clientY };
+  panStart  = { x: panX, y: panY };
+});
+window.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  panX = panStart.x + (e.clientX - dragStart.x);
+  panY = panStart.y + (e.clientY - dragStart.y);
+  updateCanvas();
+});
+window.addEventListener('mouseup', () => dragging = false);
+wrap.addEventListener('wheel', e => {
+  e.preventDefault();
+  zoom(e.deltaY < 0 ? 0.08 : -0.08);
+}, { passive: false });
+
+// Detail panel
+function openDetail(tbl) {
+  document.getElementById('d-title').textContent = tbl.icon + ' ' + tbl.name;
+  document.getElementById('d-sub').textContent = tbl.desc;
+  document.getElementById('d-cols').innerHTML = tbl.cols.map(c => `
+    <div class="detail-col">
+      <div class="dc-name">
+        ${c.pk ? '<span class="col-key pk">PK</span> ' : ''}
+        ${c.fk ? '<span class="col-key fk">FK</span> ' : ''}
+        ${c.n}
+      </div>
+      <div class="dc-meta">
+        Type: <strong>${c.t}</strong>${c.nn ? ' · NOT NULL' : ' · nullable'}
+        ${c.fk ? ` · → ${c.fk}` : ''}
+        ${c.note ? `<br>${c.note}` : ''}
+      </div>
+    </div>`).join('');
+  document.getElementById('detail').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detail').classList.remove('open');
+}
+
+render();
+resetView();
+</script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+# ============================================================
+#  OFFICE INVENTORY TRACKING SYSTEM — .gitignore
+#  Stack: Node.js / Express / React / Vite / PostgreSQL / Docker
+# ============================================================
+
+
+# ─────────────────────────────────────────────
+#  ENVIRONMENT & SECRETS  ← most important
+# ─────────────────────────────────────────────
+.env
+.env.*
+!.env.example          # keep the template, never the real values
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+certs/
+secrets/
+
+
+# ─────────────────────────────────────────────
+#  NODE
+# ─────────────────────────────────────────────
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm/
+.yarn/
+package-lock.json      # remove this line if your team uses npm ci
+# yarn.lock            # keep if using Yarn
+
+
+# ─────────────────────────────────────────────
+#  BUILD OUTPUTS
+# ─────────────────────────────────────────────
+# Vite / React frontend
+client/dist/
+client/.vite/
+client/build/
+
+# Server compiled output (if you add TypeScript later)
+server/dist/
+server/build/
+
+
+# ─────────────────────────────────────────────
+#  UPLOADS & USER FILES
+# ─────────────────────────────────────────────
+# Never commit uploaded files — serve from local disk or object storage
+server/uploads/
+server/exports/
+server/reports/
+uploads/
+*.pdf
+*.csv
+# Keep folder structure but not content
+!server/uploads/.gitkeep
+!server/exports/.gitkeep
+!server/reports/.gitkeep
+
+
+# ─────────────────────────────────────────────
+#  DATABASE
+# ─────────────────────────────────────────────
+*.sql.gz               # backup dumps
+*.dump
+pg_data/               # Docker volume mapped to host
+redis_data/
+*.sqlite
+*.sqlite3
+*.db
+
+
+# ─────────────────────────────────────────────
+#  DOCKER
+# ─────────────────────────────────────────────
+# Keep docker-compose files but ignore override with local secrets
+docker-compose.override.yml
+
+
+# ─────────────────────────────────────────────
+#  LOGS
+# ─────────────────────────────────────────────
+logs/
+*.log
+*.log.*
+server/logs/
+combined.log
+error.log
+
+
+# ─────────────────────────────────────────────
+#  TESTING & COVERAGE
+# ─────────────────────────────────────────────
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+*.lcov
+
+
+# ─────────────────────────────────────────────
+#  OS & EDITOR JUNK
+# ─────────────────────────────────────────────
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# VS Code
+.vscode/
+!.vscode/extensions.json   # keep shared extension recommendations
+!.vscode/settings.json     # keep if team shares editor config
+
+# JetBrains (WebStorm / IntelliJ)
+.idea/
+*.iml
+*.iws
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+
+
+# ─────────────────────────────────────────────
+#  MISC
+# ─────────────────────────────────────────────
+.cache/
+.temp/
+.tmp/
+tmp/
+temp/
+*.bak
+*.orig

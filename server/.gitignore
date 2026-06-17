@@ -1,0 +1,12 @@
+# ─────────────────────────────────────────────
+#  NODE
+# ─────────────────────────────────────────────
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+.npm/
+.yarn/
+package-lock.json      # remove this line if your team uses npm ci
