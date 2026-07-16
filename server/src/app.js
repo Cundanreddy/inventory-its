@@ -34,7 +34,7 @@ app.set('io', io);
 
 io.on('connection', (socket) => {
   const { role, userId } = socket.handshake.auth || {};
-  if (role === 'admin' || role === 'auditor') {
+  if (role === 'admin' || role === 'inventory manager') {
     socket.join('admins');
   }
   if (userId) {

@@ -15,7 +15,7 @@ exports.up = (knex) =>
 
     // Workflow state
     t.enu('status', [
-      'pending',   // staff submitted, awaiting admin approval
+      'pending',   // engineer submitted, awaiting admin approval
       'approved',  // admin approved, asset is checked out
       'rejected',  // admin rejected the request
       'returned',  // asset returned, assignment complete
@@ -35,7 +35,7 @@ exports.up = (knex) =>
       .references('id').inTable('users').onDelete('SET NULL');
 
     // Notes
-    t.text('request_reason').nullable();  // why the staff needs it
+    t.text('request_reason').nullable();  // why the engineer needs it
     t.text('rejection_reason').nullable();
     t.text('return_notes').nullable();    // condition on return
     t.enu('return_condition', ['good', 'damaged', 'lost']).nullable();

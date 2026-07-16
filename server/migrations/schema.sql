@@ -15,8 +15,8 @@ CREATE TABLE users (
     name                    VARCHAR(100) NOT NULL,
     email                   VARCHAR(150) NOT NULL UNIQUE,
     password_hash           VARCHAR(255) NOT NULL,
-    role                    VARCHAR(20)  NOT NULL DEFAULT 'staff'
-                                CHECK (role IN ('admin','staff','auditor')),
+    role                    VARCHAR(20)  NOT NULL DEFAULT 'readonly'
+                                CHECK (role IN ('admin','engineer','inventory manager','readonly')),
     phone                   VARCHAR(20),
     department              VARCHAR(100),
     is_active               BOOLEAN      NOT NULL DEFAULT TRUE,

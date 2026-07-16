@@ -985,6 +985,19 @@ const ALL_ENGINEERS = Array.from(new Set([
   ...MOCK_USERS.filter(u => u.role === 'Engineer').map(u => u.name),
 ]))
 
+const normalizeRole = (role) => {
+  const normalized = String(role || '').toLowerCase()
+  const roleMap = {
+    admin: 'Administrator',
+    'inventory manager': 'Inventory Manager',
+    engineer: 'Engineer',
+    readonly: 'Read-Only',
+    auditor: 'Read-Only',
+    staff: 'Engineer',
+  }
+  return roleMap[normalized] || role
+}
+
 function SignIn({ onLogin }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -992,14 +1005,28 @@ function SignIn({ onLogin }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('')
     if (!email || !password) { setError('Please enter your email and password.'); return }
     setLoading(true)
-    setTimeout(() => {
-      const user = MOCK_USERS.find(u => u.email === email && u.password === password)
-      if (user) { onLogin(user) } else { setError('Invalid email or password. Please try again.'); setLoading(false) }
-    }, 700)
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      const data = await response.json()
+      if (response.ok && data.user) {
+        const normalizedUser = { ...data.user, role: normalizeRole(data.user.role) }
+        onLogin(normalizedUser)
+      } else {
+        setError(data.message || 'Invalid email or password. Please try again.')
+        setLoading(false)
+      }
+    } catch (err) {
+      setError('An error occurred. Please try again.')
+      setLoading(false)
+    }
   }
 
   const handleQuickLogin = (user) => {
@@ -1457,8 +1484,17 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
   )
 }
 
+function getStoredUser() {
+  try {
+    const raw = localStorage.getItem('currentUser')
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
 export default function InventoryApp() {
-  const [currentUser, setCurrentUser] = useState(null)
+  const [currentUser, setCurrentUser] = useState(getStoredUser)
   const [page, setPage] = useState('dashboard')
   const [inventory, setInventory] = useState(INITIAL_INVENTORY)
   const [auditLog, setAuditLog] = useState(INITIAL_AUDIT)
@@ -1467,7 +1503,11 @@ export default function InventoryApp() {
   const [miscActiveCat, setMiscActiveCat] = useState(null)
 
   if (!currentUser) {
-    return <SignIn onLogin={(user) => { setCurrentUser(user); setPage('dashboard') }} />
+    return <SignIn onLogin={(user) => {
+      setCurrentUser(user)
+      setPage('dashboard')
+      localStorage.setItem('currentUser', JSON.stringify(user))
+    }} />
   }
 
   const role = currentUser.role
@@ -1532,7 +1572,7 @@ export default function InventoryApp() {
                 <div style={{ fontSize: 11, color: '#6b7280' }}>{currentUser.role}</div>
               </div>
             </div>
-            <button onClick={() => { setCurrentUser(null); setPage('dashboard') }} style={{ width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={() => { setCurrentUser(null); setPage('dashboard'); localStorage.removeItem('currentUser') }} style={{ width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               Sign Out
             </button>

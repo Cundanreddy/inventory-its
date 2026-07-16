@@ -6,13 +6,76 @@
 const bcrypt = require('bcryptjs');
 
 exports.seed = async (knex) => {
+  const upsertUser = async ({ name, email, password, role, department }) => {
+    const password_hash = await bcrypt.hash(password, 12);
+
+    await knex('users')
+      .insert({
+        id: knex.fn.uuid(),
+        name,
+        email,
+        password_hash,
+        role,
+        department,
+        is_active: true,
+        failed_login_attempts: 0,
+        locked_until: null,
+        created_at: knex.fn.now(),
+        updated_at: knex.fn.now(),
+      })
+      .onConflict('email')
+      .merge({
+        name,
+        password_hash,
+        role,
+        department,
+        is_active: true,
+        failed_login_attempts: 0,
+        locked_until: null,
+        updated_at: knex.fn.now(),
+      });
+  };
 
   // ── 1. Default admin user ────────────────────────────────────
-  const hash = await bcrypt.hash('Admin@1234', 12);
-  await knex('users').insert([
-    { id: knex.fn.uuid(), name: 'System Admin', email: 'admin@office.local',
-      password_hash: hash, role: 'admin', department: 'IT' },
-  ]).onConflict('email').ignore();
+  await upsertUser({
+    name: 'System Admin',
+    email: 'admin@office.local',
+    password: 'Admin@1234',
+    role: 'admin',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Arjun Mehta',
+    email: 'admin@p3acclivis.com',
+    password: 'admin123',
+    role: 'admin',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Priya Nair',
+    email: 'manager@p3acclivis.com',
+    password: 'manager123',
+    role: 'inventory manager',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Roshan Desai',
+    email: 'engineer@p3acclivis.com',
+    password: 'eng123',
+    role: 'engineer',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Sneha Pillai',
+    email: 'readonly@p3acclivis.com',
+    password: 'read123',
+    role: 'readonly',
+    department: 'IT',
+  });
 
   // ── 2. Categories ────────────────────────────────────────────
   const assetCats = [
