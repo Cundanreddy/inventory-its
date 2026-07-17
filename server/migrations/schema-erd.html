@@ -119,7 +119,7 @@ const TABLES = [
       {n:'name',        t:'varchar(100)',           nn:true,  note:'Full name'},
       {n:'email',       t:'varchar(150)',           nn:true,  note:'Unique login email'},
       {n:'password_hash',t:'varchar(255)',          nn:true,  note:'bcrypt hash, cost 12'},
-      {n:'role',        t:'enum',                  nn:true,  note:'admin | staff | auditor'},
+      {n:'role',        t:'enum',                  nn:true,  note:'admin | engineer | inventory manager | readonly'},
       {n:'phone',       t:'varchar(20)',                      note:'Optional contact phone'},
       {n:'department',  t:'varchar(100)',                     note:'Office department'},
       {n:'is_active',   t:'boolean',               nn:true,  note:'Soft disable login'},

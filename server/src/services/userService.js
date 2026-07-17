@@ -71,7 +71,7 @@ const create = async ({ name, email, password, role, phone, department }) => {
   const password_hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   const [user] = await db('users').insert({
-    name, email, password_hash, role: role || 'staff',
+    name, email, password_hash, role: role || 'engineer',
     phone:      phone      || null,
     department: department || null,
     is_active:  true,

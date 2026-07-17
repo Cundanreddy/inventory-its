@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ITS — API Test Client</title>
+<style>
+/* ── Design tokens ──────────────────────────────────────── */
+:root {
+  --bg:        #0c0e14;
+  --panel:     #13161f;
+  --card:      #191d2a;
+  --border:    #252b3b;
+  --border2:   #1f253a;
+  --accent:    #4f7cff;
+  --accent-d:  #3563e9;
+  --green:     #1ebb6e;
+  --red:       #e8404a;
+  --yellow:    #f0a030;
+  --purple:    #8b6aff;
+  --cyan:      #29c8c8;
+  --text:      #dde2ee;
+  --muted:     #5a6380;
+  --muted2:    #7a85a0;
+  --mono:      'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --sans:      'Inter', 'Segoe UI', system-ui, sans-serif;
+  --radius:    8px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Top bar ────────────────────────────────────────────── */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 20px;
+  height: 50px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.logo {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: .05em;
+  white-space: nowrap;
+}
+.logo span { color: var(--muted2); font-weight: 400; }
+
+.base-url-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 420px;
+}
+.base-url-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.base-url-input {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 10px;
+  outline: none;
+  transition: border .15s;
+}
+.base-url-input:focus { border-color: var(--accent); }
+
+.token-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.token-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+.token-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+.token-dot.authed { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.token-text { color: var(--muted2); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Layout ─────────────────────────────────────────────── */
+.app {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sidebar {
+  width: 230px;
+  min-width: 230px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.sidebar-section { padding: 12px 0 4px; }
+.sidebar-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 0 14px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sidebar-label::after { content: ''; flex: 1; height: 1px; background: var(--border2); }
+
+.endpoint-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  border-left: 2px solid transparent;
+  transition: all .12s;
+}
+.endpoint-btn:hover { background: rgba(255,255,255,.03); }
+.endpoint-btn.active {
+  background: rgba(79,124,255,.08);
+  border-left-color: var(--accent);
+}
+.method-badge {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  min-width: 38px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.GET    { background: rgba(30,187,110,.15); color: var(--green); }
+.POST   { background: rgba(79,124,255,.15); color: var(--accent); }
+.PATCH  { background: rgba(240,160,48,.15); color: var(--yellow); }
+.DELETE { background: rgba(232,64,74,.15);  color: var(--red); }
+
+.ep-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ep-desc {
+  font-size: 10px;
+  color: var(--muted2);
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Main panel ──────────────────────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Request builder ─────────────────────────────────────── */
+.request-panel {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+
+.request-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.request-method {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  outline: none;
+  min-width: 90px;
+}
+.request-url {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  padding: 7px 12px;
+  outline: none;
+  transition: border .15s;
+}
+.request-url:focus { border-color: var(--accent); }
+
+.send-btn {
+  padding: 7px 20px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: .04em;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.send-btn:hover   { background: var(--accent-d); }
+.send-btn:active  { transform: scale(.97); }
+.send-btn.loading { background: var(--muted); cursor: not-allowed; }
+
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--border2);
+  margin-bottom: 12px;
+}
+.tab {
+  padding: 5px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted2);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all .12s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Input areas */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.field-label {
+  font-size: 11px;
+  color: var(--muted2);
+  min-width: 120px;
+  font-family: var(--mono);
+}
+.field-input {
+  flex: 1;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 5px 10px;
+  outline: none;
+  transition: border .15s;
+}
+.field-input:focus { border-color: var(--accent); }
+
+textarea.field-input {
+  resize: vertical;
+  min-height: 90px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.hint {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--mono);
+  padding: 4px 0 0 128px;
+  line-height: 1.6;
+}
+
+/* ── Response panel ──────────────────────────────────────── */
+.response-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.response-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-shrink: 0;
+}
+.response-bar-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.status-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 99px;
+}
+.status-2xx { background: rgba(30,187,110,.15); color: var(--green); }
+.status-4xx { background: rgba(240,160,48,.15);  color: var(--yellow); }
+.status-5xx { background: rgba(232,64,74,.15);   color: var(--red); }
+.time-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted2);
+  margin-left: auto;
+}
+
+.response-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.response-body::-webkit-scrollbar { width: 4px; }
+.response-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+.response-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+  color: var(--muted);
+}
+.response-empty .icon { font-size: 32px; opacity: .4; }
+.response-empty p { font-size: 12px; }
+
+/* JSON syntax highlight */
+.j-key    { color: #7ec8e3; }
+.j-str    { color: #a8d8a0; }
+.j-num    { color: #f0a030; }
+.j-bool   { color: #8b6aff; }
+.j-null   { color: var(--muted2); }
+.j-punct  { color: var(--muted2); }
+
+/* ── Quick auth strip ────────────────────────────────────── */
+.auth-strip {
+  background: rgba(79,124,255,.07);
+  border: 1px solid rgba(79,124,255,.2);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.auth-strip label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.auth-strip input {
+  flex: 1;
+  min-width: 140px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 9px;
+  outline: none;
+}
+.auth-strip input:focus { border-color: var(--accent); }
+.auth-strip .auth-btn {
+  padding: 4px 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.auth-strip .auth-btn:hover { background: var(--accent-d); }
+.clear-btn {
+  padding: 4px 10px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted2);
+  font-size: 11px;
+  cursor: pointer;
+}
+.clear-btn:hover { border-color: var(--red); color: var(--red); }
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ─────────────────────────────────────────── -->
+<div class="topbar">
+  <div class="logo">ITS <span>/ API Test Client</span></div>
+  <div class="base-url-wrap">
+    <span class="base-url-label">Base URL</span>
+    <input class="base-url-input" id="baseUrl" value="http://localhost:3001" placeholder="http://localhost:3001"/>
+  </div>
+  <div class="token-wrap">
+    <div class="token-status">
+      <div class="token-dot" id="tokenDot"></div>
+      <span class="token-text" id="tokenText">Not authenticated</span>
+    </div>
+    <button class="clear-btn" onclick="clearToken()">Clear token</button>
+  </div>
+</div>
+
+<div class="app">
+
+<!-- ── Sidebar ─────────────────────────────────────────── -->
+<div class="sidebar">
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Auth</div>
+    <button class="endpoint-btn active" onclick="loadEndpoint(this, 'POST','/api/auth/login','login')">
+      <span class="method-badge POST">POST</span>
+      <div><div class="ep-label">/auth/login</div><div class="ep-desc">Get access token</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this, 'POST','/api/auth/refresh','refresh')">
+      <span class="method-badge POST">POST</span>
+      <div><div class="ep-label">/auth/refresh</div><div class="ep-desc">Rotate refresh token</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this, 'GET','/api/auth/me','me')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/auth/me</div><div class="ep-desc">Current user</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this, 'POST','/api/auth/logout','logout')">
+      <span class="method-badge POST">POST</span>
+      <div><div class="ep-label">/auth/logout</div><div class="ep-desc">Invalidate token</div></div>
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Assets</div>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/assets/stats','asset-stats')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/assets/stats</div><div class="ep-desc">Dashboard counts</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/assets','asset-list')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/assets</div><div class="ep-desc">List all assets</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/assets/:id','asset-get')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/assets/:id</div><div class="ep-desc">Single asset</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/assets/:id/history','asset-history')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/assets/:id/history</div><div class="ep-desc">Checkout history</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'POST','/api/assets','asset-create')">
+      <span class="method-badge POST">POST</span>
+      <div><div class="ep-label">/assets</div><div class="ep-desc">Create asset</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'PATCH','/api/assets/:id','asset-update')">
+      <span class="method-badge PATCH">PATCH</span>
+      <div><div class="ep-label">/assets/:id</div><div class="ep-desc">Update asset</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'PATCH','/api/assets/:id/status','asset-status')">
+      <span class="method-badge PATCH">PATCH</span>
+      <div><div class="ep-label">/assets/:id/status</div><div class="ep-desc">Change status</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'DELETE','/api/assets/:id','asset-delete')">
+      <span class="method-badge DELETE">DELETE</span>
+      <div><div class="ep-label">/assets/:id</div><div class="ep-desc">Retire asset</div></div>
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">Users</div>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/users/me','user-me')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/users/me</div><div class="ep-desc">My profile</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/users','user-list')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/users</div><div class="ep-desc">List all users</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/users/:id','user-get')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/users/:id</div><div class="ep-desc">Single user</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'POST','/api/users','user-create')">
+      <span class="method-badge POST">POST</span>
+      <div><div class="ep-label">/users</div><div class="ep-desc">Create user</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'PATCH','/api/users/:id','user-update')">
+      <span class="method-badge PATCH">PATCH</span>
+      <div><div class="ep-label">/users/:id</div><div class="ep-desc">Update user</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'PATCH','/api/users/:id/toggle-active','user-toggle')">
+      <span class="method-badge PATCH">PATCH</span>
+      <div><div class="ep-label">/users/:id/toggle-active</div><div class="ep-desc">Enable / disable</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'PATCH','/api/users/:id/reset-password','user-reset-pw')">
+      <span class="method-badge PATCH">PATCH</span>
+      <div><div class="ep-label">/users/:id/reset-password</div><div class="ep-desc">Admin reset password</div></div>
+    </button>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/users/:id/assets','user-assets')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/users/:id/assets</div><div class="ep-desc">Assigned assets</div></div>
+    </button>
+  </div>
+
+  <div class="sidebar-section">
+    <div class="sidebar-label">System</div>
+    <button class="endpoint-btn" onclick="loadEndpoint(this,'GET','/api/health','health')">
+      <span class="method-badge GET">GET</span>
+      <div><div class="ep-label">/health</div><div class="ep-desc">Server health check</div></div>
+    </button>
+  </div>
+
+</div>
+
+<!-- ── Main ────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Request builder -->
+  <div class="request-panel">
+
+    <!-- Quick login strip -->
+    <div class="auth-strip">
+      <label>⚡ Quick Login</label>
+      <input id="loginEmail" placeholder="email" value="admin@office.local" type="email"/>
+      <input id="loginPass"  placeholder="password" value="Admin@1234" type="password"/>
+      <button class="auth-btn" onclick="quickLogin()">Login & save token</button>
+    </div>
+
+    <!-- URL bar -->
+    <div class="request-row">
+      <select class="request-method" id="reqMethod" onchange="updateMethodColor()">
+        <option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option>
+      </select>
+      <input class="request-url" id="reqUrl" placeholder="/api/..." value="/api/auth/login"/>
+      <button class="send-btn" id="sendBtn" onclick="sendRequest()">Send →</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab(this,'params')">Params</button>
+      <button class="tab"        onclick="switchTab(this,'body')">Body (JSON)</button>
+      <button class="tab"        onclick="switchTab(this,'headers')">Headers</button>
+    </div>
+
+    <!-- Params tab -->
+    <div class="tab-panel active" id="tab-params">
+      <div id="params-container"></div>
+      <p class="hint">Query params appended to the URL automatically.</p>
+    </div>
+
+    <!-- Body tab -->
+    <div class="tab-panel" id="tab-body">
+      <textarea class="field-input" id="reqBody" placeholder='{ "key": "value" }'
+        style="width:100%;min-height:100px"></textarea>
+      <p class="hint">Raw JSON. Content-Type: application/json is set automatically.</p>
+    </div>
+
+    <!-- Headers tab -->
+    <div class="tab-panel" id="tab-headers">
+      <div class="field-row">
+        <span class="field-label">Authorization</span>
+        <input class="field-input" id="authHeader" placeholder="Bearer token auto-filled from login" readonly/>
+      </div>
+      <div class="field-row">
+        <span class="field-label">Content-Type</span>
+        <input class="field-input" value="application/json" readonly/>
+      </div>
+      <p class="hint">Token is set automatically after Quick Login.</p>
+    </div>
+
+  </div>
+
+  <!-- Response panel -->
+  <div class="response-panel">
+    <div class="response-bar">
+      <span class="response-bar-title">Response</span>
+      <span class="status-chip" id="statusChip" style="display:none"></span>
+      <span class="time-chip"   id="timeChip"></span>
+      <button class="clear-btn" onclick="clearResponse()" style="margin-left:auto">Clear</button>
+    </div>
+    <div class="response-body" id="responseBody">
+      <div class="response-empty">
+        <div class="icon">⬡</div>
+        <p>Send a request to see the response here.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────
+let accessToken = localStorage.getItem('its_token') || '';
+
+// ── Endpoint definitions ──────────────────────────────────
+const ENDPOINT_DEFS = {
+  // Auth
+  'login':          { method:'POST', path:'/api/auth/login',
+                      body: { email: 'admin@office.local', password: 'Admin@1234' } },
+  'refresh':        { method:'POST', path:'/api/auth/refresh' },
+  'me':             { method:'GET',  path:'/api/auth/me' },
+  'logout':         { method:'POST', path:'/api/auth/logout' },
+  // Assets
+  'asset-stats':    { method:'GET',  path:'/api/assets/stats' },
+  'asset-list':     { method:'GET',  path:'/api/assets',
+                      params: { page:'1', limit:'10' } },
+  'asset-get':      { method:'GET',  path:'/api/assets/:id',
+                      pathVars: { id: '' } },
+  'asset-history':  { method:'GET',  path:'/api/assets/:id/history',
+                      pathVars: { id: '' } },
+  'asset-create':   { method:'POST', path:'/api/assets',
+                      body: {
+                        name: 'Dell Latitude 5540',
+                        asset_tag: 'IT-0001',
+                        serial_number: 'SN-ABC123',
+                        brand: 'Dell',
+                        model: 'Latitude 5540',
+                        category_id: '',
+                        status: 'available',
+                        notes: 'New laptop'
+                      } },
+  'asset-update':   { method:'PATCH', path:'/api/assets/:id',
+                      pathVars: { id: '' },
+                      body: { notes: 'Updated via API test client' } },
+  'asset-status':   { method:'PATCH', path:'/api/assets/:id/status',
+                      pathVars: { id: '' },
+                      body: { status: 'maintenance', notes: 'Sent for repair' } },
+  'asset-delete':   { method:'DELETE', path:'/api/assets/:id',
+                      pathVars: { id: '' } },
+  // Users
+  'user-me':        { method:'GET',  path:'/api/users/me' },
+  'user-list':      { method:'GET',  path:'/api/users',
+                      params: { page:'1', limit:'10' } },
+  'user-get':       { method:'GET',  path:'/api/users/:id',
+                      pathVars: { id: '' } },
+  'user-create':    { method:'POST', path:'/api/users',
+                      body: {
+                        name: 'Jane Doe',
+                        email: 'jane@office.local',
+                        password: 'engineer@1234',
+                        role: 'engineer',
+                        department: 'Engineering'
+                      } },
+  'user-update':    { method:'PATCH', path:'/api/users/:id',
+                      pathVars: { id: '' },
+                      body: { name: 'Jane Doe', department: 'Product' } },
+  'user-toggle':    { method:'PATCH', path:'/api/users/:id/toggle-active',
+                      pathVars: { id: '' } },
+  'user-reset-pw':  { method:'PATCH', path:'/api/users/:id/reset-password',
+                      pathVars: { id: '' },
+                      body: { new_password: 'NewPass@123' } },
+  'user-assets':    { method:'GET',  path:'/api/users/:id/assets',
+                      pathVars: { id: '' } },
+  // Health
+  'health':         { method:'GET',  path:'/api/health' },
+};
+
+// ── Init ──────────────────────────────────────────────────
+updateTokenUI();
+loadEndpoint(document.querySelector('.endpoint-btn.active'), 'POST', '/api/auth/login', 'login');
+
+// ── Load endpoint into builder ────────────────────────────
+function loadEndpoint(btn, method, path, key) {
+  document.querySelectorAll('.endpoint-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const def = ENDPOINT_DEFS[key] || {};
+
+  document.getElementById('reqMethod').value = method;
+  updateMethodColor();
+
+  // Resolve path vars first
+  let resolvedPath = def.path || path;
+  const pathVars   = def.pathVars || {};
+  document.getElementById('reqUrl').value = resolvedPath;
+
+  // Build params fields
+  buildParams(def.params || {}, pathVars);
+
+  // Body
+  document.getElementById('reqBody').value = def.body
+    ? JSON.stringify(def.body, null, 2)
+    : '';
+}
+
+// ── Build dynamic param + path-var fields ─────────────────
+function buildParams(params, pathVars) {
+  const container = document.getElementById('params-container');
+  container.innerHTML = '';
+
+  // Path variables first
+  Object.entries(pathVars).forEach(([k, v]) => {
+    container.appendChild(makeFieldRow(`path: ${k}`, v, `pv_${k}`, true));
+  });
+
+  // Query params
+  Object.entries(params).forEach(([k, v]) => {
+    container.appendChild(makeFieldRow(`query: ${k}`, v, `qp_${k}`, false));
+  });
+
+  if (container.children.length === 0) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:11px;font-family:var(--mono)">No params for this endpoint.</p>';
+  }
+}
+
+function makeFieldRow(label, value, id, isPathVar) {
+  const row = document.createElement('div');
+  row.className = 'field-row';
+  row.innerHTML = `
+    <span class="field-label" style="${isPathVar ? 'color:var(--yellow)' : ''}">${label}</span>
+    <input class="field-input" id="${id}" value="${value}"
+           placeholder="${isPathVar ? 'required' : 'optional'}"
+           style="${isPathVar ? 'border-color:rgba(240,160,48,.3)' : ''}"/>`;
+  return row;
+}
+
+// ── Resolve URL with path vars + query params ─────────────
+function buildFinalUrl() {
+  const base   = document.getElementById('baseUrl').value.replace(/\/$/, '');
+  let   path   = document.getElementById('reqUrl').value;
+
+  // Substitute path variables (:id etc)
+  document.querySelectorAll('[id^="pv_"]').forEach(el => {
+    const key = el.id.replace('pv_', '');
+    if (el.value) path = path.replace(`:${key}`, encodeURIComponent(el.value));
+  });
+
+  // Query params
+  const qp = [];
+  document.querySelectorAll('[id^="qp_"]').forEach(el => {
+    const key = el.id.replace('qp_', '');
+    if (el.value) qp.push(`${encodeURIComponent(key)}=${encodeURIComponent(el.value)}`);
+  });
+
+  return base + path + (qp.length ? '?' + qp.join('&') : '');
+}
+
+// ── Send request ──────────────────────────────────────────
+async function sendRequest() {
+  const method  = document.getElementById('reqMethod').value;
+  const url     = buildFinalUrl();
+  const bodyStr = document.getElementById('reqBody').value.trim();
+  const btn     = document.getElementById('sendBtn');
+
+  btn.textContent = 'Sending…';
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  const headers = { 'Content-Type': 'application/json' };
+  if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`;
+
+  const opts = { method, headers, credentials: 'include' };
+  if (['POST','PATCH','PUT'].includes(method) && bodyStr) {
+    try { JSON.parse(bodyStr); } catch {
+      showError('Invalid JSON in request body.');
+      resetSendBtn(); return;
+    }
+    opts.body = bodyStr;
+  }
+
+  const t0 = Date.now();
+  try {
+    const res  = await fetch(url, opts);
+    const ms   = Date.now() - t0;
+    const text = await res.text();
+
+    let parsed;
+    try { parsed = JSON.parse(text); } catch { parsed = null; }
+
+    showResponse(res.status, parsed ?? text, ms);
+
+    // Auto-save token if login response
+    if (parsed?.accessToken) {
+      accessToken = parsed.accessToken;
+      localStorage.setItem('its_token', accessToken);
+      document.getElementById('authHeader').value = `Bearer ${accessToken}`;
+      updateTokenUI();
+    }
+  } catch (err) {
+    showError(`Network error: ${err.message}\n\nMake sure the API server is running at ${document.getElementById('baseUrl').value}`);
+  }
+
+  resetSendBtn();
+}
+
+function resetSendBtn() {
+  const btn = document.getElementById('sendBtn');
+  btn.textContent = 'Send →';
+  btn.classList.remove('loading');
+  btn.disabled = false;
+}
+
+// ── Quick login ───────────────────────────────────────────
+async function quickLogin() {
+  const email    = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPass').value;
+  const base     = document.getElementById('baseUrl').value.replace(/\/$/, '');
+
+  try {
+    const res  = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+
+    if (data.accessToken) {
+      accessToken = data.accessToken;
+      localStorage.setItem('its_token', accessToken);
+      document.getElementById('authHeader').value = `Bearer ${accessToken}`;
+      updateTokenUI();
+      showResponse(res.status, data, 0);
+    } else {
+      showResponse(res.status, data, 0);
+    }
+  } catch (err) {
+    showError(`Login failed: ${err.message}`);
+  }
+}
+
+// ── Response rendering ────────────────────────────────────
+function showResponse(status, data, ms) {
+  const chip = document.getElementById('statusChip');
+  chip.style.display = 'inline-block';
+  chip.textContent   = status;
+  chip.className     = 'status-chip ' + (status < 300 ? 'status-2xx' : status < 500 ? 'status-4xx' : 'status-5xx');
+
+  document.getElementById('timeChip').textContent = ms ? `${ms}ms` : '';
+
+  const body = document.getElementById('responseBody');
+  if (typeof data === 'object') {
+    body.innerHTML = syntaxHighlight(JSON.stringify(data, null, 2));
+  } else {
+    body.innerHTML = `<span style="color:var(--muted2)">${escHtml(String(data))}</span>`;
+  }
+}
+
+function showError(msg) {
+  document.getElementById('statusChip').style.display = 'none';
+  document.getElementById('timeChip').textContent = '';
+  document.getElementById('responseBody').innerHTML =
+    `<span style="color:var(--red); font-family:var(--mono)">${escHtml(msg)}</span>`;
+}
+
+function clearResponse() {
+  document.getElementById('statusChip').style.display = 'none';
+  document.getElementById('timeChip').textContent = '';
+  document.getElementById('responseBody').innerHTML = `
+    <div class="response-empty">
+      <div class="icon">⬡</div>
+      <p>Send a request to see the response here.</p>
+    </div>`;
+}
+
+// ── JSON syntax highlight ─────────────────────────────────
+function syntaxHighlight(json) {
+  return json
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?|[{}\[\],:])/g,
+      (match) => {
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) return `<span class="j-key">${match}</span>`;
+          return `<span class="j-str">${match}</span>`;
+        }
+        if (/true|false/.test(match)) return `<span class="j-bool">${match}</span>`;
+        if (/null/.test(match))       return `<span class="j-null">${match}</span>`;
+        if (/[{}\[\],:]/.test(match)) return `<span class="j-punct">${match}</span>`;
+        return `<span class="j-num">${match}</span>`;
+      }
+    );
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Token UI ──────────────────────────────────────────────
+function updateTokenUI() {
+  const dot  = document.getElementById('tokenDot');
+  const text = document.getElementById('tokenText');
+  const hdr  = document.getElementById('authHeader');
+
+  if (accessToken) {
+    dot.classList.add('authed');
+    // Decode JWT payload to show user name
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]));
+      text.textContent = `${payload.name || payload.email} (${payload.role})`;
+    } catch {
+      text.textContent = 'Authenticated';
+    }
+    hdr.value = `Bearer ${accessToken}`;
+  } else {
+    dot.classList.remove('authed');
+    text.textContent = 'Not authenticated';
+    hdr.value = '';
+  }
+}
+
+function clearToken() {
+  accessToken = '';
+  localStorage.removeItem('its_token');
+  updateTokenUI();
+}
+
+// ── Tab switching ─────────────────────────────────────────
+function switchTab(btn, name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById(`tab-${name}`).classList.add('active');
+}
+
+// ── Method color on select ────────────────────────────────
+function updateMethodColor() {
+  const sel    = document.getElementById('reqMethod');
+  const colors = { GET:'var(--green)', POST:'var(--accent)', PATCH:'var(--yellow)', DELETE:'var(--red)' };
+  sel.style.color = colors[sel.value] || 'var(--text)';
+}
+updateMethodColor();
+
+// ── Keyboard shortcut: Ctrl+Enter to send ────────────────
+document.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendRequest();
+});
+</script>
+</body>
+</html>
