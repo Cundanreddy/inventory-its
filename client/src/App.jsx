@@ -6,7 +6,7 @@ export default function App() {
   return (
     <div className="App">
       <NewInventory />
-      console.log('bcrypt.hash('admin123', 12)')
+     
     </div>
   )
 }

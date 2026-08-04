@@ -25,9 +25,8 @@ const BASE_SELECT = [
   'a.updated_at',
   // Joined fields
   'c.name   as category_name',
-  'l.building',
-  'l.room',
-  db.raw("CONCAT(l.building, ' / ', l.room) as location_label"),
+  'l.region',
+  db.raw("CONCAT(l.region) as location_label"),
   'u.name   as assignee_name',
   'u.email  as assignee_email',
   's.name   as supplier_name',
