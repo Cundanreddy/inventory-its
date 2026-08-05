@@ -20,7 +20,7 @@ exports.up = async (knex) => {
   await knex.schema.createTable('locations', (t) => {
     t.uuid('id').primary().defaultTo(knex.fn.uuid());
 
-    t.string('region', 100).notNullable();  // e.g. "Main Office"
+    t.string('region', 100).notNullable();  // e.g. "Banglore" , "Pune"
    
     t.boolean('is_active').notNullable().defaultTo(true);
 
