@@ -57,13 +57,14 @@ CREATE TABLE locations (
 CREATE TABLE suppliers (
     id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     name            VARCHAR(150) NOT NULL UNIQUE,
-    contact_person  VARCHAR(100),
+    company_name  VARCHAR(100),
     email           VARCHAR(150),
     phone           VARCHAR(30),
     address         TEXT,
     website         VARCHAR(255),
-    notes           TEXT,
+    remark          TEXT,
     is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+    is_client       BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );

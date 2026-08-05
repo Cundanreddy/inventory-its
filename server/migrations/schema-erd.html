@@ -158,13 +158,14 @@ const TABLES = [
     cols:[
       {n:'id',             t:'uuid',        pk:true, nn:true},
       {n:'name',           t:'varchar(150)',         nn:true, note:'Unique supplier name'},
-      {n:'contact_person', t:'varchar(100)'},
+      {n:'company_name', t:'varchar(100)'},
       {n:'email',          t:'varchar(150)'},
       {n:'phone',          t:'varchar(30)'},
       {n:'address',        t:'text'},
       {n:'website',        t:'varchar(255)'},
-      {n:'notes',          t:'text'},
+      {n:'remark',          t:'text'},
       {n:'is_active',      t:'boolean',             nn:true},
+      {n:'is_client',      t:'boolean',             nn:true},
       {n:'created_at',     t:'timestamp',           nn:true},
       {n:'updated_at',     t:'timestamp',           nn:true},
     ]
