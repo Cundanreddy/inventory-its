@@ -167,7 +167,7 @@ const getAssignedAssets = async (userId) => {
       'a.id','a.name','a.asset_tag','a.serial_number',
       'a.brand','a.model','a.assigned_since','a.warranty_expiry',
       'c.name as category_name',
-      db.raw("CONCAT(l.building, ' / ', l.room) as location_label")
+      db.raw("CONCAT(l.region) as location_label")
     )
     .orderBy('a.assigned_since', 'desc');
 };

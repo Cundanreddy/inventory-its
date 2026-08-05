@@ -15,10 +15,16 @@ import {
 
 let barcodeCounter = 9
 let auditIdCounter = 4
+let sourceIdCounter = 1
 
 function generateBarcode() {
   const num = String(barcodeCounter++).padStart(6, '0')
   return `P3-IND-${num}`
+}
+
+function generateSourceId() {
+  const num = String(sourceIdCounter++).padStart(4, '0')
+  return `SRC-${num}`
 }
 
 function generateAuditEntry(user, action, item, prev, next) {
@@ -188,7 +194,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
   const [showAllocate, setShowAllocate] = useState(null)
   const [showReturn, setShowReturn] = useState(null)
 
-  const emptyForm = { id: '', name: '', type: '', category: '3PL AA/CP', serial: '', asset: '', barcode: generateBarcode(), region: 'Bengaluru', engineer: '', receivedDate: '', returnDate: '', status: 'Available', remarks: '', quantity: 1, allocationDate: '', expectedReturn: '', clientName: '', clientCompany: '', clientAddress: '', clientPhone: '', clientEmail: '', clientGender: '' }
+  const emptyForm = { id: '', name: '', type: '', category: '3PL AA/CP', serial: '', asset: '', barcode: generateBarcode(), region: 'Bengaluru', engineer: '', receivedDate: '', returnDate: '', status: 'Available', remarks: '', quantity: 1, allocationDate: '', expectedReturn: '', sourceType: 'Client', sourceId: '', sourceName: '', sourceCompany: '', sourceAddress: '', sourcePhone: '', sourceEmail: '', sourceWebsite: '', sourceRemark: '' }
   const [form, setForm] = useState(emptyForm)
 
   const filtered = useMemo(() => inventory.filter(i =>
@@ -201,7 +207,12 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleAdd = () => {
-    const newItem = { ...form, id: form.id || `INV-${Date.now()}`, barcode: form.barcode || generateBarcode() }
+    const newItem = {
+      ...form,
+      id: form.id || `INV-${Date.now()}`,
+      barcode: form.barcode || generateBarcode(),
+      sourceId: form.sourceId || generateSourceId(),
+    }
     setInventory(inv => [...inv, newItem])
     setAuditLog(al => [...al, generateAuditEntry('Admin', 'Inventory Added', newItem.id, '–', 'Available')])
     setShowAdd(false)
@@ -255,11 +266,11 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
         </div>
         <select value={region} onChange={e => setRegion(e.target.value)} style={{ padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151' }}>
           <option value="">All Regions</option>
-          {REGIONS.map(r => <option key={r}>{r}</option>)}
+          {REGIONS.map(r => <option key={r}>{r}</option>)}//this region option shld  be fetch from the backend region table
         </select>
         <select value={category} onChange={e => setCategory(e.target.value)} style={{ padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151' }}>
           <option value="">All Categories</option>
-          {INVENTORY_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+          {INVENTORY_CATEGORIES.map(c => <option key={c}>{c}</option>)} //this category option shld  be fetch from the backend category table
         </select>
         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#374151' }}>
           <option value="">All Statuses</option>
@@ -271,7 +282,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              {['ID', 'Name', 'Category', 'Serial', 'Barcode', 'Region', 'Engineer', 'Client Details', 'Status', 'Actions'].map(h => (
+              {['ID', 'Name', 'Category', 'Serial', 'Barcode', 'Region', 'Engineer', 'Source Details', 'Status', 'Actions'].map(h => (
                 <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -287,15 +298,20 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
                 <td style={{ padding: '10px 14px', fontFamily: 'monospace', fontSize: 12, color: '#6b7280' }}>{item.barcode}</td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>{item.region}</td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>{item.engineer || <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                <td style={{ padding: '10px 14px', minWidth: 160 }}>
-                  {item.clientName ? (
-                    <div style={{ fontSize: 12, lineHeight: 1.6 }}>
-                      <div style={{ fontWeight: 700, color: '#111827' }}>{item.clientName}</div>
-                      {item.clientCompany && <div style={{ color: '#2563eb', fontSize: 11, fontWeight: 600 }}>🏢 {item.clientCompany}</div>}
-                      {item.clientPhone && <div style={{ color: '#6b7280' }}>📞 {item.clientPhone}</div>}
-                      {item.clientEmail && <div style={{ color: '#6b7280' }}>✉ {item.clientEmail}</div>}
-                      {item.clientGender && <div style={{ color: '#9ca3af', fontSize: 11 }}>{item.clientGender}</div>}
-                      {item.clientAddress && <div style={{ color: '#9ca3af', fontSize: 11 }}>{item.clientAddress}</div>}
+                <td style={{ padding: '10px 14px', minWidth: 180 }}>
+                  {item.sourceName ? (
+                    <div style={{ fontSize: 12, lineHeight: 1.7 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 99, background: item.sourceType === 'Supplier' ? '#f0fdf4' : '#eff6ff', color: item.sourceType === 'Supplier' ? '#16a34a' : '#2563eb', border: `1px solid ${item.sourceType === 'Supplier' ? '#86efac' : '#93c5fd'}` }}>{item.sourceType || 'Client'}</span>
+                        <span style={{ fontWeight: 700, color: '#111827' }}>{item.sourceName}</span>
+                      </div>
+                      {item.sourceId && <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#6b7280', background: '#f3f4f6', padding: '1px 6px', borderRadius: 4, display: 'inline-block', marginBottom: 2 }}>{item.sourceId}</div>}
+                      {item.sourceCompany && <div style={{ color: '#2563eb', fontSize: 11, fontWeight: 600 }}>🏢 {item.sourceCompany}</div>}
+                      {item.sourcePhone && <div style={{ color: '#6b7280' }}>📞 {item.sourcePhone}</div>}
+                      {item.sourceEmail && <div style={{ color: '#6b7280' }}>✉ {item.sourceEmail}</div>}
+                      {item.sourceWebsite && <div style={{ color: '#6b7280' }}>🌐 {item.sourceWebsite}</div>}
+                      {item.sourceAddress && <div style={{ color: '#9ca3af', fontSize: 11 }}>📍 {item.sourceAddress}</div>}
+                      {item.sourceRemark && <div style={{ color: '#9ca3af', fontSize: 11, fontStyle: 'italic' }}>"{item.sourceRemark}"</div>}
                     </div>
                   ) : (
                     <span style={{ color: '#d1d5db' }}>—</span>
@@ -338,23 +354,42 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
             <Input label="Remarks" value={form.remarks} onChange={v => setF('remarks', v)} />
           </div>
 
-          {/* Client Details Section */}
+          {/* Source Details Section */}
           <div style={{ marginTop: 20, paddingTop: 18, borderTop: '2px solid #e5e7eb' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width={14} height={14} fill="none" stroke="#2563eb" strokeWidth={2} viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Client Details</h4>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Source Details</h4>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400 }}>(optional)</span>
             </div>
+            {/* Source Type Radio Buttons */}
+            <div style={{ display: 'flex', gap: 24, marginBottom: 18 }}>
+              {['Client', 'Supplier'].map(type => (
+                <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ position: 'relative', width: 18, height: 18 }}>
+                    <input type="radio" name="addSourceType" value={type} checked={form.sourceType === type} onChange={() => setF('sourceType', type)}
+                      style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }} />
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${form.sourceType === type ? '#2563eb' : '#d1d5db'}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {form.sourceType === type && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb' }} />}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: form.sourceType === type ? 700 : 500, color: form.sourceType === type ? '#2563eb' : '#374151' }}>{type}</span>
+                </label>
+              ))}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-              <Input label="Client Name" value={form.clientName} onChange={v => setF('clientName', v)} placeholder="Full name" />
-              <Input label="Company Name" value={form.clientCompany} onChange={v => setF('clientCompany', v)} placeholder="Company / Organisation" />
-              <Input label="Phone Number" value={form.clientPhone} onChange={v => setF('clientPhone', v)} placeholder="+91 XXXXX XXXXX" />
-              <Input label="Email Address" value={form.clientEmail} onChange={v => setF('clientEmail', v)} type="email" placeholder="client@example.com" />
-              <Input label="Gender" value={form.clientGender} onChange={v => setF('clientGender', v)} options={['Male', 'Female', 'Other', 'Prefer not to say']} />
+              <Input label="Source ID" value={form.sourceId} onChange={v => setF('sourceId', v)} placeholder="Auto-generated if blank (e.g. SRC-0001)" />
+              <Input label="Name" value={form.sourceName} onChange={v => setF('sourceName', v)} placeholder="Full name" />
+              <Input label="Company Name" value={form.sourceCompany} onChange={v => setF('sourceCompany', v)} placeholder="Company / Organisation" />
+              <Input label="Phone" value={form.sourcePhone} onChange={v => setF('sourcePhone', v)} placeholder="+91 XXXXX XXXXX" />
+              <Input label="Email" value={form.sourceEmail} onChange={v => setF('sourceEmail', v)} type="email" placeholder="email@example.com" />
+              <Input label="Website" value={form.sourceWebsite} onChange={v => setF('sourceWebsite', v)} placeholder="https://example.com" />
               <div style={{ gridColumn: '1 / -1' }}>
-                <Input label="Address" value={form.clientAddress} onChange={v => setF('clientAddress', v)} placeholder="Street, City, State, PIN" />
+                <Input label="Address" value={form.sourceAddress} onChange={v => setF('sourceAddress', v)} placeholder="Street, City, State, PIN" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Input label="Remark" value={form.sourceRemark} onChange={v => setF('sourceRemark', v)} placeholder="Any additional notes about this source…" />
               </div>
             </div>
           </div>
@@ -381,23 +416,42 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
             <Input label="Remarks" value={form.remarks} onChange={v => setF('remarks', v)} />
           </div>
 
-          {/* Client Details Section */}
+          {/* Source Details Section */}
           <div style={{ marginTop: 20, paddingTop: 18, borderTop: '2px solid #e5e7eb' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <div style={{ width: 28, height: 28, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <svg width={14} height={14} fill="none" stroke="#2563eb" strokeWidth={2} viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </div>
-              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Client Details</h4>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Source Details</h4>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400 }}>(optional)</span>
             </div>
+            {/* Source Type Radio Buttons */}
+            <div style={{ display: 'flex', gap: 24, marginBottom: 18 }}>
+              {['Client', 'Supplier'].map(type => (
+                <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
+                  <div style={{ position: 'relative', width: 18, height: 18 }}>
+                    <input type="radio" name="editSourceType" value={type} checked={(form.sourceType || 'Client') === type} onChange={() => setF('sourceType', type)}
+                      style={{ position: 'absolute', opacity: 0, width: '100%', height: '100%', cursor: 'pointer', margin: 0 }} />
+                    <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${(form.sourceType || 'Client') === type ? '#2563eb' : '#d1d5db'}`, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {(form.sourceType || 'Client') === type && <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb' }} />}
+                    </div>
+                  </div>
+                  <span style={{ fontSize: 14, fontWeight: (form.sourceType || 'Client') === type ? 700 : 500, color: (form.sourceType || 'Client') === type ? '#2563eb' : '#374151' }}>{type}</span>
+                </label>
+              ))}
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-              <Input label="Client Name" value={form.clientName || ''} onChange={v => setF('clientName', v)} placeholder="Full name" />
-              <Input label="Company Name" value={form.clientCompany || ''} onChange={v => setF('clientCompany', v)} placeholder="Company / Organisation" />
-              <Input label="Phone Number" value={form.clientPhone || ''} onChange={v => setF('clientPhone', v)} placeholder="+91 XXXXX XXXXX" />
-              <Input label="Email Address" value={form.clientEmail || ''} onChange={v => setF('clientEmail', v)} type="email" placeholder="client@example.com" />
-              <Input label="Gender" value={form.clientGender || ''} onChange={v => setF('clientGender', v)} options={['Male', 'Female', 'Other', 'Prefer not to say']} />
+              <Input label="Source ID" value={form.sourceId || ''} onChange={v => setF('sourceId', v)} placeholder="Auto-generated if blank (e.g. SRC-0001)" />
+              <Input label="Name" value={form.sourceName || ''} onChange={v => setF('sourceName', v)} placeholder="Full name" />
+              <Input label="Company Name" value={form.sourceCompany || ''} onChange={v => setF('sourceCompany', v)} placeholder="Company / Organisation" />
+              <Input label="Phone" value={form.sourcePhone || ''} onChange={v => setF('sourcePhone', v)} placeholder="+91 XXXXX XXXXX" />
+              <Input label="Email" value={form.sourceEmail || ''} onChange={v => setF('sourceEmail', v)} type="email" placeholder="email@example.com" />
+              <Input label="Website" value={form.sourceWebsite || ''} onChange={v => setF('sourceWebsite', v)} placeholder="https://example.com" />
               <div style={{ gridColumn: '1 / -1' }}>
-                <Input label="Address" value={form.clientAddress || ''} onChange={v => setF('clientAddress', v)} placeholder="Street, City, State, PIN" />
+                <Input label="Address" value={form.sourceAddress || ''} onChange={v => setF('sourceAddress', v)} placeholder="Street, City, State, PIN" />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Input label="Remark" value={form.sourceRemark || ''} onChange={v => setF('sourceRemark', v)} placeholder="Any additional notes about this source…" />
               </div>
             </div>
           </div>
@@ -1211,7 +1265,7 @@ const TRACKING_LABEL = {
 
 function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', qty: '', unit: '', notes: '', status: 'In Stock' })
+  const [form, setForm] = useState({ name: '', qty: '', unit: '', remark: '', status: 'In Stock' })
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const STATUS_COLORS = {
@@ -1225,7 +1279,7 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
     if (!form.name.trim() || !activeCat) return
     const newItem = { id: Date.now(), ...form, sourceCategory: activeCat, date: new Date().toLocaleDateString(), isLost: false, isReturned: false, isDamaged: false }
     setItems(prev => [...prev, newItem])
-    setForm({ name: '', qty: '', unit: '', notes: '', status: 'In Stock' })
+    setForm({ name: '', qty: '', unit: '', remark: '', status: 'In Stock' })
     setShowAdd(false)
   }
 
@@ -1248,7 +1302,7 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
   const countForCat = (catKey) => getItemsForCat(catKey).length
 
   const BackBtn = () => (
-    <button onClick={() => { setActiveCat(null); setShowAdd(false); setForm({ name: '', qty: '', unit: '', notes: '', status: 'In Stock' }) }} style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
+    <button onClick={() => { setActiveCat(null); setShowAdd(false); setForm({ name: '', qty: '', unit: '', remark: '', status: 'In Stock' }) }} style={{ background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}>
       <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg> Back
     </button>
   )
@@ -1318,8 +1372,8 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
                 </select>
               </div>
               <div style={{ marginBottom: 14, gridColumn: '1 / -1' }}>
-                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Notes</label>
-                <input value={form.notes} onChange={e => setF('notes', e.target.value)} placeholder="Any additional details…" style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 5 }}>Remark</label>
+                <input value={form.remark} onChange={e => setF('remark', e.target.value)} placeholder="Any additional details…" style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 13, boxSizing: 'border-box' }} />
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
@@ -1348,7 +1402,7 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
                   {[
                     'Item Name',
                     ...(isTracking ? ['Source'] : []),
-                    'Qty', 'Unit', 'Status', 'Notes', 'Added On',
+                    'Qty', 'Unit', 'Status', 'Remark', 'Added On',
                     ...(isTracking ? ['Lost', 'Returned', 'Damaged'] : ['Mark as', 'Actions'])
                   ].map(h => (
                     <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 700, color: '#374151', whiteSpace: 'nowrap' }}>{h}</th>
@@ -1367,7 +1421,7 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
                       <td style={{ padding: '10px 14px' }}>
                         <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: 99, fontSize: 11, fontWeight: 700, background: sc.bg, color: sc.color }}>{item.status}</span>
                       </td>
-                      <td style={{ padding: '10px 14px', color: '#6b7280', maxWidth: 160 }}>{item.notes || '—'}</td>
+                      <td style={{ padding: '10px 14px', color: '#6b7280', maxWidth: 160 }}>{item.remark || '—'}</td>
                       <td style={{ padding: '10px 14px', color: '#9ca3af', fontSize: 12, whiteSpace: 'nowrap' }}>{item.date}</td>
 
                       {/* Source cat: show 3 flag buttons + delete */}

@@ -33,12 +33,10 @@ CREATE TABLE users (
 CREATE TABLE categories (
     id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
     name        VARCHAR(100) NOT NULL,
-    type        VARCHAR(20)  NOT NULL CHECK (type IN ('asset','consumable')),
-    description TEXT,
     is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-    UNIQUE (name, type)
+    UNIQUE (name)
 );
 
 -- ─────────────────────────────────────────────
@@ -46,13 +44,11 @@ CREATE TABLE categories (
 -- ─────────────────────────────────────────────
 CREATE TABLE locations (
     id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
-    building    VARCHAR(100) NOT NULL,
-    room        VARCHAR(100) NOT NULL,
-    notes       TEXT,
+    region      VARCHAR(100) NOT NULL,
     is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-    UNIQUE (building, room)
+    UNIQUE (region)
 );
 
 -- ─────────────────────────────────────────────
@@ -61,13 +57,14 @@ CREATE TABLE locations (
 CREATE TABLE suppliers (
     id              UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
     name            VARCHAR(150) NOT NULL UNIQUE,
-    contact_person  VARCHAR(100),
+    company_name  VARCHAR(100),
     email           VARCHAR(150),
     phone           VARCHAR(30),
     address         TEXT,
     website         VARCHAR(255),
-    notes           TEXT,
+    remark          TEXT,
     is_active       BOOLEAN      NOT NULL DEFAULT TRUE,
+    is_client       BOOLEAN      NOT NULL DEFAULT TRUE,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );
@@ -396,37 +393,17 @@ CREATE INDEX idx_refresh_expires ON refresh_tokens(expires_at);
 -- ============================================================
 
 -- Default categories (assets)
-INSERT INTO categories (name, type) VALUES
-  ('Computers & Laptops',    'asset'),
-  ('Monitors & Displays',    'asset'),
-  ('Peripherals',            'asset'),
-  ('Networking Equipment',   'asset'),
-  ('Furniture',              'asset'),
-  ('Office Equipment',       'asset'),
-  ('Vehicles',               'asset'),
-  ('Other',                  'asset')
-ON CONFLICT (name, type) DO NOTHING;
-
--- Default categories (consumables)
-INSERT INTO categories (name, type) VALUES
-  ('Stationery',             'consumable'),
-  ('Printer Supplies',       'consumable'),
-  ('Pantry & Beverages',     'consumable'),
-  ('Cleaning Supplies',      'consumable'),
-  ('Electrical & Batteries', 'consumable'),
-  ('Packaging',              'consumable'),
-  ('Other',                  'consumable')
-ON CONFLICT (name, type) DO NOTHING;
+INSERT INTO categories (name) VALUES
+    ('P3 Accessories'),
+    ('3PL AA/CP'),
+    ('3PL GAS')
+ON CONFLICT (name) DO NOTHING;
 
 -- Default locations
-INSERT INTO locations (building, room) VALUES
-  ('Main Office', 'IT Storage Room'),
-  ('Main Office', 'Conference Room A'),
-  ('Main Office', 'Reception'),
-  ('Main Office', 'Pantry'),
-  ('Main Office', 'General Floor'),
-  ('Branch Office', 'General Floor')
-ON CONFLICT (building, room) DO NOTHING;
+INSERT INTO locations (region) VALUES
+  ('Banglore'),
+  ('Pune')
+ON CONFLICT (region) DO NOTHING;
 
 -- System settings defaults
 INSERT INTO system_settings (key, value, type, description, is_secret) VALUES

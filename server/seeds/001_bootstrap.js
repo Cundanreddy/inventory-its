@@ -88,26 +88,22 @@ exports.seed = async (knex) => {
   ];
 
   for (const name of assetCats) {
-    await knex('categories').insert({ id: knex.fn.uuid(), name, type: 'asset' })
-      .onConflict(['name', 'type']).ignore();
+    await knex('categories').insert({ id: knex.fn.uuid(), name })
+      .onConflict(['name']).ignore();
   }
   for (const name of consumableCats) {
-    await knex('categories').insert({ id: knex.fn.uuid(), name, type: 'consumable' })
-      .onConflict(['name', 'type']).ignore();
+    await knex('categories').insert({ id: knex.fn.uuid(), name })
+      .onConflict(['name']).ignore();
   }
 
   // ── 3. Locations ─────────────────────────────────────────────
   const locations = [
-    { building: 'Main Office', room: 'IT Storage Room' },
-    { building: 'Main Office', room: 'Conference Room A' },
-    { building: 'Main Office', room: 'Reception' },
-    { building: 'Main Office', room: 'Pantry' },
-    { building: 'Main Office', room: 'General Floor' },
-    { building: 'Branch Office', room: 'General Floor' },
+    { region: 'Bangalore' },
+    { region: 'Pune' },
   ];
   for (const loc of locations) {
     await knex('locations').insert({ id: knex.fn.uuid(), ...loc })
-      .onConflict(['building', 'room']).ignore();
+      .onConflict(['region']).ignore();
   }
 
   // ── 4. System settings defaults ──────────────────────────────

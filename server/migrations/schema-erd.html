@@ -136,21 +136,17 @@ const TABLES = [
     cols:[
       {n:'id',          t:'uuid',    pk:true, nn:true},
       {n:'name',        t:'varchar(100)',     nn:true, note:'Category label'},
-      {n:'type',        t:'enum',            nn:true, note:'asset | consumable'},
-      {n:'description', t:'text'},
       {n:'is_active',   t:'boolean',         nn:true},
       {n:'created_at',  t:'timestamp',       nn:true},
       {n:'updated_at',  t:'timestamp',       nn:true},
     ]
   },
   {
-    id:'locations', name:'locations', icon:'📍', color:'#22c55e', desc:'Physical storage locations (building > room)',
+    id:'locations', name:'locations', icon:'📍', color:'#22c55e', desc:'Physical storage locations (region)',
     pos:{x:700,y:60},
     cols:[
       {n:'id',       t:'uuid',        pk:true, nn:true},
-      {n:'building', t:'varchar(100)',         nn:true, note:'e.g. Main Office'},
-      {n:'room',     t:'varchar(100)',         nn:true, note:'e.g. IT Storage Room'},
-      {n:'notes',    t:'text'},
+      {n:'region',   t:'varchar(100)',         nn:true, note:'e.g. Main Office'},
       {n:'is_active',t:'boolean',             nn:true},
       {n:'created_at',t:'timestamp',          nn:true},
       {n:'updated_at',t:'timestamp',          nn:true},
@@ -162,13 +158,14 @@ const TABLES = [
     cols:[
       {n:'id',             t:'uuid',        pk:true, nn:true},
       {n:'name',           t:'varchar(150)',         nn:true, note:'Unique supplier name'},
-      {n:'contact_person', t:'varchar(100)'},
+      {n:'company_name', t:'varchar(100)'},
       {n:'email',          t:'varchar(150)'},
       {n:'phone',          t:'varchar(30)'},
       {n:'address',        t:'text'},
       {n:'website',        t:'varchar(255)'},
-      {n:'notes',          t:'text'},
+      {n:'remark',          t:'text'},
       {n:'is_active',      t:'boolean',             nn:true},
+      {n:'is_client',      t:'boolean',             nn:true},
       {n:'created_at',     t:'timestamp',           nn:true},
       {n:'updated_at',     t:'timestamp',           nn:true},
     ]
