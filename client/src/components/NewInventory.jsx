@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Button from './ui/Button'
 import Input from './ui/Input'
 import Modal from './ui/Modal'
@@ -12,6 +12,36 @@ import {
   INITIAL_INVENTORY,
   INITIAL_AUDIT,
 } from '../data/inventory'
+
+// ─── API Config ───────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:3001'
+
+function getToken() {
+  try { return localStorage.getItem('accessToken') } catch { return null }
+}
+function storeToken(token) {
+  try { localStorage.setItem('accessToken', token) } catch {}
+}
+function clearToken() {
+  try { localStorage.removeItem('accessToken') } catch {}
+}
+async function apiFetch(path, options = {}) {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {}),
+    },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.message || `API error ${res.status}`)
+  }
+  return res.json()
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 let barcodeCounter = 9
 let auditIdCounter = 4
@@ -184,7 +214,7 @@ function Dashboard({ inventory, currentUser }) {
   )
 }
 
-function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }) {
+function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, locations, categories, rawLocations, rawCategories, locLoading, catLoading, locError, catError, currentUser }) {
   const [region, setRegion] = useState('')
   const [category, setCategory] = useState('')
   const [search, setSearch] = useState('')
@@ -206,29 +236,118 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
 
   const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
-  const handleAdd = () => {
-    const newItem = {
-      ...form,
-      id: form.id || `INV-${Date.now()}`,
-      barcode: form.barcode || generateBarcode(),
-      sourceId: form.sourceId || generateSourceId(),
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+
+  const handleAdd = async () => {
+    setSaveError('')
+    setSaving(true)
+    try {
+      const payload = {
+        name:          form.name,
+        asset_tag:     form.id || undefined,
+        serial_number: form.serial,
+        brand:         form.type,
+        model:         form.type,
+        category_id:   form.category_id || undefined,
+        location_id:   form.location_id || undefined,
+        status:        form.status.toLowerCase(),
+        quantity:      Number(form.quantity) || 1,
+        notes:         form.remarks || undefined,
+        barcode:       form.barcode || generateBarcode(),
+        asset_number:  form.asset || undefined,
+        source_type:    form.sourceType || undefined,
+        source_id:      form.sourceId || generateSourceId(),
+        source_name:    form.sourceName || undefined,
+        source_company: form.sourceCompany || undefined,
+        source_phone:   form.sourcePhone || undefined,
+        source_email:   form.sourceEmail || undefined,
+        source_website: form.sourceWebsite || undefined,
+        source_address: form.sourceAddress || undefined,
+        source_remark:  form.sourceRemark || undefined,
+      }
+
+      // Remove undefined keys before sending
+      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k])
+
+      const created = await apiFetch('/api/assets', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+
+      // Use the ID returned by backend; fall back to frontend-generated
+      const newItem = {
+        ...form,
+        id: created?.id || created?.asset_tag || form.id || `INV-${Date.now()}`,
+        barcode: created?.barcode || payload.barcode,
+        sourceId: created?.source_id || payload.source_id,
+      }
+
+      setInventory(inv => [...inv, newItem])
+      setAuditLog(al => [...al, generateAuditEntry(currentUser?.name || 'User', 'Inventory Added', newItem.id, '–', form.status)])
+      setShowAdd(false)
+      setForm(emptyForm)
+    } catch (err) {
+      setSaveError(err.message || 'Failed to save. Please try again.')
+    } finally {
+      setSaving(false)
     }
-    setInventory(inv => [...inv, newItem])
-    setAuditLog(al => [...al, generateAuditEntry('Admin', 'Inventory Added', newItem.id, '–', 'Available')])
-    setShowAdd(false)
-    setForm(emptyForm)
   }
 
-  const handleEdit = () => {
-    setInventory(inv => inv.map(i => i.id === showEdit.id ? form : i))
-    setAuditLog(al => [...al, generateAuditEntry('Admin', 'Inventory Updated', form.id, '–', form.status)])
-    setShowEdit(null)
+  const handleEdit = async () => {
+    setSaveError('')
+    setSaving(true)
+    try {
+      const payload = {
+        name:          form.name,
+        asset_tag:     form.id || undefined,
+        serial_number: form.serial,
+        brand:         form.type,
+        model:         form.type,
+        category_id:   form.category_id || undefined,
+        location_id:   form.location_id || undefined,
+        status:        form.status.toLowerCase(),
+        quantity:      Number(form.quantity) || 1,
+        notes:         form.remarks || undefined,
+        barcode:       form.barcode || undefined,
+        asset_number:  form.asset || undefined,
+        source_type:    form.sourceType || undefined,
+        source_id:      form.sourceId || undefined,
+        source_name:    form.sourceName || undefined,
+        source_company: form.sourceCompany || undefined,
+        source_phone:   form.sourcePhone || undefined,
+        source_email:   form.sourceEmail || undefined,
+        source_website: form.sourceWebsite || undefined,
+        source_address: form.sourceAddress || undefined,
+        source_remark:  form.sourceRemark || undefined,
+      }
+
+      Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k])
+
+      await apiFetch(`/api/assets/${showEdit.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      })
+
+      setInventory(inv => inv.map(i => i.id === showEdit.id ? { ...form } : i))
+      setAuditLog(al => [...al, generateAuditEntry(currentUser?.name || 'User', 'Inventory Updated', form.id, '–', form.status)])
+      setShowEdit(null)
+    } catch (err) {
+      setSaveError(err.message || 'Failed to update. Please try again.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!confirm('Delete this inventory item?')) return
-    setInventory(inv => inv.filter(i => i.id !== id))
-    setAuditLog(al => [...al, generateAuditEntry('Admin', 'Inventory Deleted', id, '–', 'Deleted')])
+    try {
+      await apiFetch(`/api/assets/${id}`, { method: 'DELETE' })
+      setInventory(inv => inv.filter(i => i.id !== id))
+      setAuditLog(al => [...al, generateAuditEntry(currentUser?.name || 'User', 'Inventory Deleted', id, '–', 'Deleted')])
+    } catch (err) {
+      alert(`Delete failed: ${err.message}`)
+    }
   }
 
   const [allocForm, setAllocForm] = useState({ engineer: '', project: '', allocationDate: '', expectedReturn: '' })
@@ -343,11 +462,35 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
             <Input label="Item ID" value={form.id} onChange={v => setF('id', v)} placeholder="Auto-generated if blank" />
             <Input label="Device/Item Name" value={form.name} onChange={v => setF('name', v)} required />
             <Input label="Device Type" value={form.type} onChange={v => setF('type', v)} required />
-            <Input label="Category" value={form.category} onChange={v => setF('category', v)} options={INVENTORY_CATEGORIES} required />
+
+            {/* Category — stores label + UUID */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Category <span style={{ color: '#ef4444' }}>*</span></label>
+              <select value={form.category_id || ''} onChange={e => {
+                const obj = rawCategories.find(c => c.id === e.target.value)
+                setForm(f => ({ ...f, category_id: e.target.value, category: obj ? (obj.name || obj.category_name || obj.title || '') : '' }))
+              }} style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                <option value="">{catLoading ? 'Loading…' : 'Select category…'}</option>
+                {rawCategories.map(c => <option key={c.id} value={c.id}>{c.name || c.category_name || c.title}</option>)}
+              </select>
+            </div>
+
             <Input label="Serial Number" value={form.serial} onChange={v => setF('serial', v)} required />
             <Input label="Asset Number" value={form.asset} onChange={v => setF('asset', v)} required />
             <Input label="Barcode" value={form.barcode} onChange={v => setF('barcode', v)} />
-            <Input label="Region" value={form.region} onChange={v => setF('region', v)} options={REGIONS} required />
+
+            {/* Region — stores label + UUID */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Region <span style={{ color: '#ef4444' }}>*</span></label>
+              <select value={form.location_id || ''} onChange={e => {
+                const obj = rawLocations.find(l => l.id === e.target.value)
+                setForm(f => ({ ...f, location_id: e.target.value, region: obj ? (obj.location_label || obj.region || obj.name || '') : '' }))
+              }} style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                <option value="">{locLoading ? 'Loading…' : 'Select region…'}</option>
+                {rawLocations.map(l => <option key={l.id} value={l.id}>{l.location_label || l.region || l.name}</option>)}
+              </select>
+            </div>
+
             <Input label="Status" value={form.status} onChange={v => setF('status', v)} options={STATUS_LIST} required />
             <Input label="Quantity" value={form.quantity} onChange={v => setF('quantity', v)} type="number" required />
             <Input label="Received Date" value={form.receivedDate} onChange={v => setF('receivedDate', v)} type="date" />
@@ -394,24 +537,56 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-            <Button variant="secondary" onClick={() => setShowAdd(false)}>Cancel</Button>
-            <Button onClick={handleAdd} icon={<Icon name="check" size={14} />}>Add Item</Button>
+          {saveError && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {saveError}
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+            <Button variant="secondary" onClick={() => { setShowAdd(false); setSaveError('') }}>Cancel</Button>
+            <Button onClick={handleAdd} disabled={saving} icon={saving ? null : <Icon name="check" size={14} />}>
+              {saving ? 'Saving…' : 'Add Item'}
+            </Button>
           </div>
         </Modal>
       )}
 
       {showEdit && (
-        <Modal title="Edit Inventory Item" onClose={() => setShowEdit(null)} width={720}>
+        <Modal title="Edit Inventory Item" onClose={() => { setShowEdit(null); setSaveError('') }} width={720}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Input label="Item ID" value={form.id} onChange={v => setF('id', v)} />
             <Input label="Device/Item Name" value={form.name} onChange={v => setF('name', v)} required />
             <Input label="Device Type" value={form.type} onChange={v => setF('type', v)} />
-            <Input label="Category" value={form.category} onChange={v => setF('category', v)} options={INVENTORY_CATEGORIES} />
+
+            {/* Category — stores label + UUID */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Category</label>
+              <select value={form.category_id || ''} onChange={e => {
+                const obj = rawCategories.find(c => c.id === e.target.value)
+                setForm(f => ({ ...f, category_id: e.target.value, category: obj ? (obj.name || obj.category_name || obj.title || '') : '' }))
+              }} style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                <option value="">{catLoading ? 'Loading…' : 'Select category…'}</option>
+                {rawCategories.map(c => <option key={c.id} value={c.id}>{c.name || c.category_name || c.title}</option>)}
+              </select>
+            </div>
+
             <Input label="Serial Number" value={form.serial} onChange={v => setF('serial', v)} />
             <Input label="Asset Number" value={form.asset} onChange={v => setF('asset', v)} />
             <Input label="Barcode" value={form.barcode} onChange={v => setF('barcode', v)} />
-            <Input label="Region" value={form.region} onChange={v => setF('region', v)} options={REGIONS} />
+
+            {/* Region — stores label + UUID */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Region</label>
+              <select value={form.location_id || ''} onChange={e => {
+                const obj = rawLocations.find(l => l.id === e.target.value)
+                setForm(f => ({ ...f, location_id: e.target.value, region: obj ? (obj.location_label || obj.region || obj.name || '') : '' }))
+              }} style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                <option value="">{locLoading ? 'Loading…' : 'Select region…'}</option>
+                {rawLocations.map(l => <option key={l.id} value={l.id}>{l.location_label || l.region || l.name}</option>)}
+              </select>
+            </div>
+
             <Input label="Status" value={form.status} onChange={v => setF('status', v)} options={STATUS_LIST} />
             <Input label="Remarks" value={form.remarks} onChange={v => setF('remarks', v)} />
           </div>
@@ -425,7 +600,6 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
               <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Source Details</h4>
               <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400 }}>(optional)</span>
             </div>
-            {/* Source Type Radio Buttons */}
             <div style={{ display: 'flex', gap: 24, marginBottom: 18 }}>
               {['Client', 'Supplier'].map(type => (
                 <label key={type} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', userSelect: 'none' }}>
@@ -456,9 +630,17 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role }
             </div>
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
-            <Button variant="secondary" onClick={() => setShowEdit(null)}>Cancel</Button>
-            <Button onClick={handleEdit} icon={<Icon name="check" size={14} />}>Save Changes</Button>
+          {saveError && (
+            <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <svg width={14} height={14} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {saveError}
+            </div>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
+            <Button variant="secondary" onClick={() => { setShowEdit(null); setSaveError('') }}>Cancel</Button>
+            <Button onClick={handleEdit} disabled={saving} icon={saving ? null : <Icon name="check" size={14} />}>
+              {saving ? 'Saving…' : 'Save Changes'}
+            </Button>
           </div>
         </Modal>
       )}
@@ -1072,7 +1254,7 @@ function SignIn({ onLogin }) {
       const data = await response.json()
       if (response.ok && data.user) {
         const normalizedUser = { ...data.user, role: normalizeRole(data.user.role) }
-        onLogin(normalizedUser)
+        onLogin(normalizedUser, data.accessToken)
       } else {
         setError(data.message || 'Invalid email or password. Please try again.')
         setLoading(false)
@@ -1556,11 +1738,60 @@ export default function InventoryApp() {
   const [miscItems, setMiscItems] = useState([])
   const [miscActiveCat, setMiscActiveCat] = useState(null)
 
+  // ── Live locations & categories ─────────────────────────────────────────────
+  const [rawLocations, setRawLocations] = useState([])
+  const [rawCategories, setRawCategories] = useState([])
+  const [locations, setLocations] = useState(REGIONS)
+  const [categories, setCategories] = useState(INVENTORY_CATEGORIES)
+  const [locLoading, setLocLoading] = useState(false)
+  const [catLoading, setCatLoading] = useState(false)
+  const [locError, setLocError] = useState(null)
+  const [catError, setCatError] = useState(null)
+
+  useEffect(() => {
+    if (!currentUser) return
+
+    setLocLoading(true)
+    apiFetch('/api/locations')
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data.data || data.results || [])
+        const active = list.filter(l => l.is_active !== false)
+        setRawLocations(active)
+        if (active.length > 0)
+          setLocations(active.map(l => l.location_label || l.region || l.name || String(l)))
+        setLocError(null)
+      })
+      .catch(() => setLocError('Could not load locations — using defaults.'))
+      .finally(() => setLocLoading(false))
+
+    setCatLoading(true)
+    apiFetch('/api/categories')
+      .then(data => {
+        const list = Array.isArray(data) ? data : (data.data || data.results || [])
+        const active = list.filter(c => c.is_active !== false)
+        setRawCategories(active)
+        if (active.length > 0)
+          setCategories(active.map(c => c.name || c.category_name || c.title || String(c)))
+        setCatError(null)
+      })
+      .catch(() => setCatError('Could not load categories — using defaults.'))
+      .finally(() => setCatLoading(false))
+  }, [currentUser])
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const handleLogout = () => {
+    setCurrentUser(null)
+    setPage('dashboard')
+    localStorage.removeItem('currentUser')
+    clearToken()
+  }
+
   if (!currentUser) {
-    return <SignIn onLogin={(user) => {
+    return <SignIn onLogin={(user, token) => {
       setCurrentUser(user)
       setPage('dashboard')
       localStorage.setItem('currentUser', JSON.stringify(user))
+      if (token) storeToken(token)
     }} />
   }
 
@@ -1626,7 +1857,7 @@ export default function InventoryApp() {
                 <div style={{ fontSize: 11, color: '#6b7280' }}>{currentUser.role}</div>
               </div>
             </div>
-            <button onClick={() => { setCurrentUser(null); setPage('dashboard'); localStorage.removeItem('currentUser') }} style={{ width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <button onClick={handleLogout} style={{ width: '100%', padding: '8px 12px', background: '#1f2937', border: '1px solid #374151', borderRadius: 8, color: '#9ca3af', fontSize: 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
               <svg width={13} height={13} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
               Sign Out
             </button>
@@ -1648,7 +1879,7 @@ export default function InventoryApp() {
 
         <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
           {page === 'dashboard' && <Dashboard inventory={inventory} currentUser={currentUser} />}
-          {page === 'inventory' && <InventoryTable inventory={inventory} setInventory={setInventory} auditLog={auditLog} setAuditLog={setAuditLog} role={role} />}
+          {page === 'inventory' && <InventoryTable inventory={inventory} setInventory={setInventory} auditLog={auditLog} setAuditLog={setAuditLog} role={role} currentUser={currentUser} locations={locations} categories={categories} rawLocations={rawLocations} rawCategories={rawCategories} locLoading={locLoading} catLoading={catLoading} locError={locError} catError={catError} />}
           {page === 'barcode' && <BarcodeSection inventory={inventory} />}
           {page === 'allocation' && <AllocationSection inventory={inventory} setInventory={setInventory} auditLog={auditLog} setAuditLog={setAuditLog} currentUser={currentUser} />}
           {page === 'returns' && <ReturnSection inventory={inventory} currentUser={currentUser} />}
