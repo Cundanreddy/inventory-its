@@ -35,11 +35,27 @@ async function apiFetch(path, options = {}) {
       ...(options.headers || {}),
     },
   })
+  const json = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.message || `API error ${res.status}`)
+    console.error(`[API ${res.status}] ${path}`, json)
+    let msg = ''
+    // Handle 'issues' array (Zod/validation errors)
+    if (Array.isArray(json.issues) && json.issues.length > 0) {
+      msg = json.issues.map(e => {
+        const field = Array.isArray(e.path) ? e.path.join('.') : (e.field || e.param || '')
+        const message = e.message || e.msg || JSON.stringify(e)
+        return field ? `${field}: ${message}` : message
+      }).join(' • ')
+    } else if (Array.isArray(json.errors) && json.errors.length > 0) {
+      msg = json.errors.map(e => e.message || e.msg || JSON.stringify(e)).join(' • ')
+    } else if (Array.isArray(json.details) && json.details.length > 0) {
+      msg = json.details.map(e => e.message || JSON.stringify(e)).join(' • ')
+    } else {
+      msg = json.message || json.error || json.detail || `API error ${res.status}`
+    }
+    throw new Error(msg)
   }
-  return res.json()
+  return json
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -224,7 +240,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
   const [showAllocate, setShowAllocate] = useState(null)
   const [showReturn, setShowReturn] = useState(null)
 
-  const emptyForm = { id: '', name: '', type: '', category: '3PL AA/CP', serial: '', asset: '', barcode: generateBarcode(), region: 'Bengaluru', engineer: '', receivedDate: '', returnDate: '', status: 'Available', remarks: '', quantity: 1, allocationDate: '', expectedReturn: '', sourceType: 'Client', sourceId: '', sourceName: '', sourceCompany: '', sourceAddress: '', sourcePhone: '', sourceEmail: '', sourceWebsite: '', sourceRemark: '' }
+  const emptyForm = { id: '', name: '', type: '', category: '3PL AA/CP', serial: '', asset: '', barcode: generateBarcode(), region: 'Bengaluru', engineer: '', receivedDate: '', returnDate: '', status: 'Available', remarks: '', quantity: 1, allocationDate: '', expectedReturn: '', sourceType: 'Client', sourceId: '', sourceName: '', sourceCompany: '', sourceAddress: '', sourcePhone: '', sourceEmail: '', sourceWebsite: '', sourceRemark: '', model: '', purchase_date: '', purchase_price: '', invoice_number: '', warranty_expiry: '', assigned_to: '', assigned_since: '', next_maintenance_date: '' }
   const [form, setForm] = useState(emptyForm)
 
   const filtered = useMemo(() => inventory.filter(i =>
@@ -239,36 +255,90 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
+  const [fieldErrors, setFieldErrors] = useState({})
+
   const handleAdd = async () => {
+    // ── Frontend validation ───────────────────────────────────────────────────
+    const errors = {}
+    if (!form.name?.trim())       errors.name        = 'Brand is required'
+    if (!form.type?.trim())       errors.type        = 'Name is required'
+    if (!form.category_id)        errors.category_id = 'Please select a Category'
+    if (!form.serial?.trim())     errors.serial      = 'Serial Number is required'
+    if (!form.asset?.trim())      errors.asset       = 'Asset Tag is required'
+    if (!form.location_id)        errors.location_id = 'Please select a Region'
+    if (!form.status)             errors.status      = 'Status is required'
+    if (!form.quantity || Number(form.quantity) < 1) errors.quantity = 'Quantity must be at least 1'
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setSaveError('Please fill in all required fields highlighted below.')
+      return
+    }
+    setFieldErrors({})
+    // ─────────────────────────────────────────────────────────────────────────
     setSaveError('')
     setSaving(true)
     try {
+      // Map frontend status labels → exact backend enum values
+      const STATUS_MAP = {
+        'Available': 'available',
+        'Allocated': 'assigned',
+        'Reserved':  'assigned',
+        'Returned':  'available',
+        'Lost':      'lost',
+        'Damaged':   'maintenance',
+        'Repair':    'maintenance',
+        'Retired':   'retired',
+        'Disposed':  'disposed',
+      }
+      const mappedStatus = STATUS_MAP[form.status] || 'available'
+
+      // Build payload with ONLY fields the backend /api/assets accepts
+
+
+
+
+
+
+
+      // Build payload with ONLY fields the backend /api/assets accepts
       const payload = {
-        name:          form.name,
-        asset_tag:     form.id || undefined,
-        serial_number: form.serial,
-        brand:         form.type,
-        model:         form.type,
-        category_id:   form.category_id || undefined,
-        location_id:   form.location_id || undefined,
-        status:        form.status.toLowerCase(),
-        quantity:      Number(form.quantity) || 1,
-        notes:         form.remarks || undefined,
-        barcode:       form.barcode || generateBarcode(),
-        asset_number:  form.asset || undefined,
-        source_type:    form.sourceType || undefined,
-        source_id:      form.sourceId || generateSourceId(),
-        source_name:    form.sourceName || undefined,
-        source_company: form.sourceCompany || undefined,
-        source_phone:   form.sourcePhone || undefined,
-        source_email:   form.sourceEmail || undefined,
-        source_website: form.sourceWebsite || undefined,
-        source_address: form.sourceAddress || undefined,
-        source_remark:  form.sourceRemark || undefined,
+        name:                  form.type?.trim(),
+        asset_tag:             form.asset?.trim() || undefined,
+        serial_number:         form.serial?.trim(),
+        brand:                 form.name?.trim() || undefined,
+        model:                 form.model?.trim() || undefined,
+        category_id:           form.category_id || undefined,
+        location_id:           form.location_id || undefined,
+        status:                mappedStatus,
+        notes:                 form.remarks?.trim() || undefined,
+        barcode:               form.barcode || generateBarcode(),
+        purchase_date:         form.purchase_date || undefined,
+        purchase_price:        form.purchase_price !== '' && form.purchase_price != null ? Number(form.purchase_price) : undefined,
+        invoice_number:        form.invoice_number?.trim() || undefined,
+        warranty_expiry:       form.warranty_expiry || undefined,
+        assigned_to:           form.assigned_to?.trim() || undefined,
+        assigned_since:        form.assigned_since || undefined,
+        next_maintenance_date: form.next_maintenance_date || undefined,
+      }
+
+      // Source details — only include if at least a name was entered
+      if (form.sourceName?.trim()) {
+        payload.source_type    = form.sourceType || 'Client'
+        payload.source_name    = form.sourceName.trim()
+        payload.source_company = form.sourceCompany?.trim() || undefined
+        payload.source_phone   = form.sourcePhone?.trim() || undefined
+        payload.source_email   = form.sourceEmail?.trim() || undefined
+        payload.source_website = form.sourceWebsite?.trim() || undefined
+        payload.source_address = form.sourceAddress?.trim() || undefined
+        payload.source_remark  = form.sourceRemark?.trim() || undefined
       }
 
       // Remove undefined keys before sending
       Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k])
+
+      // DEBUG — remove after confirming fields are correct
+      console.log('[Asset Create] Payload being sent:', JSON.stringify(payload, null, 2))
 
       const created = await apiFetch('/api/assets', {
         method: 'POST',
@@ -296,36 +366,57 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
 
   const handleEdit = async () => {
     setSaveError('')
+    setSaveError('')
     setSaving(true)
     try {
+      const STATUS_MAP = {
+        'Available': 'available',
+        'Allocated': 'assigned',
+        'Reserved':  'assigned',
+        'Returned':  'available',
+        'Lost':      'lost',
+        'Damaged':   'maintenance',
+        'Repair':    'maintenance',
+        'Retired':   'retired',
+        'Disposed':  'disposed',
+      }
+      const mappedStatus = STATUS_MAP[form.status] || 'available'
+
       const payload = {
-        name:          form.name,
-        asset_tag:     form.id || undefined,
-        serial_number: form.serial,
-        brand:         form.type,
-        model:         form.type,
-        category_id:   form.category_id || undefined,
-        location_id:   form.location_id || undefined,
-        status:        form.status.toLowerCase(),
-        quantity:      Number(form.quantity) || 1,
-        notes:         form.remarks || undefined,
-        barcode:       form.barcode || undefined,
-        asset_number:  form.asset || undefined,
-        source_type:    form.sourceType || undefined,
-        source_id:      form.sourceId || undefined,
-        source_name:    form.sourceName || undefined,
-        source_company: form.sourceCompany || undefined,
-        source_phone:   form.sourcePhone || undefined,
-        source_email:   form.sourceEmail || undefined,
-        source_website: form.sourceWebsite || undefined,
-        source_address: form.sourceAddress || undefined,
-        source_remark:  form.sourceRemark || undefined,
+        name:                  form.type?.trim(),
+        asset_tag:             form.asset?.trim() || undefined,
+        serial_number:         form.serial?.trim(),
+        brand:                 form.name?.trim() || undefined,
+        model:                 form.model?.trim() || undefined,
+        category_id:           form.category_id || undefined,
+        location_id:           form.location_id || undefined,
+        status:                mappedStatus,
+        notes:                 form.remarks?.trim() || undefined,
+        barcode:               form.barcode || undefined,
+        purchase_date:         form.purchase_date || undefined,
+        purchase_price:        form.purchase_price !== '' && form.purchase_price != null ? Number(form.purchase_price) : undefined,
+        invoice_number:        form.invoice_number?.trim() || undefined,
+        warranty_expiry:       form.warranty_expiry || undefined,
+        assigned_to:           form.assigned_to?.trim() || undefined,
+        assigned_since:        form.assigned_since || undefined,
+        next_maintenance_date: form.next_maintenance_date || undefined,
+      }
+
+      if (form.sourceName?.trim()) {
+        payload.source_type    = form.sourceType || 'Client'
+        payload.source_name    = form.sourceName.trim()
+        payload.source_company = form.sourceCompany?.trim() || undefined
+        payload.source_phone   = form.sourcePhone?.trim() || undefined
+        payload.source_email   = form.sourceEmail?.trim() || undefined
+        payload.source_website = form.sourceWebsite?.trim() || undefined
+        payload.source_address = form.sourceAddress?.trim() || undefined
+        payload.source_remark  = form.sourceRemark?.trim() || undefined
       }
 
       Object.keys(payload).forEach(k => payload[k] === undefined && delete payload[k])
 
       await apiFetch(`/api/assets/${showEdit.id}`, {
-        method: 'PUT',
+        method: 'PATCH',
         body: JSON.stringify(payload),
       })
 
@@ -441,7 +532,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
                   <div style={{ display: 'flex', gap: 6 }}>
                     {(role === 'Administrator' || role === 'Inventory Manager') && (
                       <>
-                        <button title="Edit" onClick={() => { setForm(item); setShowEdit(item) }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer' }}><Icon name="edit" size={13} color="#374151" /></button>
+                        <button title="Edit" onClick={() => { setForm({ ...item, assigned_to: item.assigned_to || item.engineer || '' }); setShowEdit(item) }} style={{ background: '#f3f4f6', border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer' }}><Icon name="edit" size={13} color="#374151" /></button>
                         {item.status === 'Available' && <button title="Allocate" onClick={() => { setShowAllocate(item); setAllocForm({ engineer: '', project: '', allocationDate: new Date().toISOString().slice(0, 10), expectedReturn: '' }) }} style={{ background: '#dbeafe', border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer' }}><Icon name="allocate" size={13} color="#2563eb" /></button>}
                         {item.status === 'Allocated' && <button title="Return" onClick={() => { setShowReturn(item); setRetForm({ condition: 'Good' }) }} style={{ background: '#dcfce7', border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer' }}><Icon name="return" size={13} color="#16a34a" /></button>}
                         {role === 'Administrator' && <button title="Delete" onClick={() => handleDelete(item.id)} style={{ background: '#fee2e2', border: 'none', borderRadius: 6, padding: 6, cursor: 'pointer' }}><Icon name="trash" size={13} color="#dc2626" /></button>}
@@ -457,44 +548,134 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
       <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>{filtered.length} of {inventory.length} records</div>
 
       {showAdd && (
-        <Modal title="Add Inventory Item" onClose={() => setShowAdd(false)} width={720}>
+        <Modal title="Add Inventory Item" onClose={() => { setShowAdd(false); setSaveError(''); setFieldErrors({}) }} width={720}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
-            <Input label="Item ID" value={form.id} onChange={v => setF('id', v)} placeholder="Auto-generated if blank" />
-            <Input label="Device/Item Name" value={form.name} onChange={v => setF('name', v)} required />
-            <Input label="Device Type" value={form.type} onChange={v => setF('type', v)} required />
+            {/* Helper: red border + message if field has error */}
+            {(() => {
+              const err = (key) => fieldErrors[key]
+                ? <p style={{ margin: '4px 0 0', fontSize: 11, color: '#dc2626', fontWeight: 500 }}>⚠ {fieldErrors[key]}</p>
+                : null
+              const borderStyle = (key) => fieldErrors[key] ? '1.5px solid #ef4444' : '1.5px solid #d1d5db'
+              return (<>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Item ID</label>
+                  <input value={form.id} onChange={e => setF('id', e.target.value)} placeholder="Auto-generated if blank"
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                </div>
 
-            {/* Category — stores label + UUID */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Category <span style={{ color: '#ef4444' }}>*</span></label>
-              <select value={form.category_id || ''} onChange={e => {
-                const obj = rawCategories.find(c => c.id === e.target.value)
-                setForm(f => ({ ...f, category_id: e.target.value, category: obj ? (obj.name || obj.category_name || obj.title || '') : '' }))
-              }} style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
-                <option value="">{catLoading ? 'Loading…' : 'Select category…'}</option>
-                {rawCategories.map(c => <option key={c.id} value={c.id}>{c.name || c.category_name || c.title}</option>)}
-              </select>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Brand <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input value={form.name} onChange={e => { setF('name', e.target.value); setFieldErrors(fe => ({ ...fe, name: '' })) }} placeholder="e.g. Dell, HP"
+                    style={{ width: '100%', padding: '9px 12px', border: borderStyle('name'), borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                  {err('name')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Name<span style={{ color: '#ef4444' }}>*</span></label>
+                  <input value={form.type} onChange={e => { setF('type', e.target.value); setFieldErrors(fe => ({ ...fe, type: '' })) }} placeholder="e.g. Laptop, Test Bench"
+                    style={{ width: '100%', padding: '9px 12px', border: borderStyle('type'), borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                  {err('type')}
+                </div>
+
+                {/* Category */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Category <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select value={form.category_id || ''} onChange={e => {
+                    const obj = rawCategories.find(c => c.id === e.target.value)
+                    setForm(f => ({ ...f, category_id: e.target.value, category: obj ? (obj.name || obj.category_name || obj.title || '') : '' }))
+                    setFieldErrors(fe => ({ ...fe, category_id: '' }))
+                  }} style={{ width: '100%', padding: '9px 12px', border: borderStyle('category_id'), borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                    <option value="">{catLoading ? 'Loading…' : 'Select category…'}</option>
+                    {rawCategories.map(c => <option key={c.id} value={c.id}>{c.name || c.category_name || c.title}</option>)}
+                  </select>
+                  {err('category_id')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Serial Number <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input value={form.serial} onChange={e => { setF('serial', e.target.value); setFieldErrors(fe => ({ ...fe, serial: '' })) }} placeholder="e.g. SN-ABC123"
+                    style={{ width: '100%', padding: '9px 12px', border: borderStyle('serial'), borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                  {err('serial')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Asset Tag <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input value={form.asset} onChange={e => { setF('asset', e.target.value); setFieldErrors(fe => ({ ...fe, asset: '' })) }} placeholder="e.g. AST-1001"
+                    style={{ width: '100%', padding: '9px 12px', border: borderStyle('asset'), borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                  {err('asset')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Barcode</label>
+                  <input value={form.barcode} onChange={e => setF('barcode', e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                </div>
+
+                {/* Region */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Region <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select value={form.location_id || ''} onChange={e => {
+                    const obj = rawLocations.find(l => l.id === e.target.value)
+                    setForm(f => ({ ...f, location_id: e.target.value, region: obj ? (obj.location_label || obj.region || obj.name || '') : '' }))
+                    setFieldErrors(fe => ({ ...fe, location_id: '' }))
+                  }} style={{ width: '100%', padding: '9px 12px', border: borderStyle('location_id'), borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                    <option value="">{locLoading ? 'Loading…' : 'Select region…'}</option>
+                    {rawLocations.map(l => <option key={l.id} value={l.id}>{l.location_label || l.region || l.name}</option>)}
+                  </select>
+                  {err('location_id')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Status <span style={{ color: '#ef4444' }}>*</span></label>
+                  <select value={form.status} onChange={e => { setF('status', e.target.value); setFieldErrors(fe => ({ ...fe, status: '' })) }}
+                    style={{ width: '100%', padding: '9px 12px', border: borderStyle('status'), borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
+                    <option value="">Select status…</option>
+                    {STATUS_LIST.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                  {err('status')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Quantity <span style={{ color: '#ef4444' }}>*</span></label>
+                  <input type="number" value={form.quantity} onChange={e => { setF('quantity', e.target.value); setFieldErrors(fe => ({ ...fe, quantity: '' })) }} min="1"
+                    style={{ width: '100%', padding: '9px 12px', border: borderStyle('quantity'), borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                  {err('quantity')}
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Received Date</label>
+                  <input type="date" value={form.receivedDate} onChange={e => setF('receivedDate', e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Remarks</label>
+                  <input value={form.remarks} onChange={e => setF('remarks', e.target.value)}
+                    style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', boxSizing: 'border-box' }} />
+                </div>
+              </>)
+            })()}
+          </div>
+
+          {/* Asset & Assignment Details Section */}
+          <div style={{ marginTop: 20, paddingTop: 18, borderTop: '2px solid #e5e7eb' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width={14} height={14} fill="none" stroke="#2563eb" strokeWidth={2} viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </div>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Asset & Assignment Details</h4>
+              <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400 }}>(optional)</span>
             </div>
-
-            <Input label="Serial Number" value={form.serial} onChange={v => setF('serial', v)} required />
-            <Input label="Asset Number" value={form.asset} onChange={v => setF('asset', v)} required />
-            <Input label="Barcode" value={form.barcode} onChange={v => setF('barcode', v)} />
-
-            {/* Region — stores label + UUID */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Region <span style={{ color: '#ef4444' }}>*</span></label>
-              <select value={form.location_id || ''} onChange={e => {
-                const obj = rawLocations.find(l => l.id === e.target.value)
-                setForm(f => ({ ...f, location_id: e.target.value, region: obj ? (obj.location_label || obj.region || obj.name || '') : '' }))
-              }} style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #d1d5db', borderRadius: 8, fontSize: 14, color: '#111827', background: '#fff' }}>
-                <option value="">{locLoading ? 'Loading…' : 'Select region…'}</option>
-                {rawLocations.map(l => <option key={l.id} value={l.id}>{l.location_label || l.region || l.name}</option>)}
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+              <Input label="Model" value={form.model} onChange={v => setF('model', v)} placeholder="e.g. Latitude 5540" />
+              <Input label="Purchase Date" value={form.purchase_date} onChange={v => setF('purchase_date', v)} type="date" />
+              <Input label="Purchase Price" value={form.purchase_price} onChange={v => setF('purchase_price', v)} type="number" placeholder="e.g. 55000" />
+              <Input label="Invoice Number" value={form.invoice_number} onChange={v => setF('invoice_number', v)} placeholder="e.g. INV-2026-001" />
+              <Input label="Warranty Expiry" value={form.warranty_expiry} onChange={v => setF('warranty_expiry', v)} type="date" />
+              <Input label="Assigned To" value={form.assigned_to} onChange={v => setForm(f => ({ ...f, assigned_to: v, engineer: v }))} options={ALL_ENGINEERS} placeholder="Select engineer…" />
+              <Input label="Assigned Since" value={form.assigned_since} onChange={v => setF('assigned_since', v)} type="date" />
+              <Input label="Next Maintenance Date" value={form.next_maintenance_date} onChange={v => setF('next_maintenance_date', v)} type="date" />
             </div>
-
-            <Input label="Status" value={form.status} onChange={v => setF('status', v)} options={STATUS_LIST} required />
-            <Input label="Quantity" value={form.quantity} onChange={v => setF('quantity', v)} type="number" required />
-            <Input label="Received Date" value={form.receivedDate} onChange={v => setF('receivedDate', v)} type="date" />
-            <Input label="Remarks" value={form.remarks} onChange={v => setF('remarks', v)} />
           </div>
 
           {/* Source Details Section */}
@@ -544,7 +725,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-            <Button variant="secondary" onClick={() => { setShowAdd(false); setSaveError('') }}>Cancel</Button>
+            <Button variant="secondary" onClick={() => { setShowAdd(false); setSaveError(''); setFieldErrors({}) }}>Cancel</Button>
             <Button onClick={handleAdd} disabled={saving} icon={saving ? null : <Icon name="check" size={14} />}>
               {saving ? 'Saving…' : 'Add Item'}
             </Button>
@@ -553,11 +734,11 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
       )}
 
       {showEdit && (
-        <Modal title="Edit Inventory Item" onClose={() => { setShowEdit(null); setSaveError('') }} width={720}>
+        <Modal title="Edit Inventory Item" onClose={() => { setShowEdit(null); setSaveError(''); setFieldErrors({}) }} width={720}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
             <Input label="Item ID" value={form.id} onChange={v => setF('id', v)} />
-            <Input label="Device/Item Name" value={form.name} onChange={v => setF('name', v)} required />
-            <Input label="Device Type" value={form.type} onChange={v => setF('type', v)} />
+            <Input label="Brand" value={form.name} onChange={v => setF('name', v)} required />
+            <Input label="Name" value={form.type} onChange={v => setF('type', v)} />
 
             {/* Category — stores label + UUID */}
             <div style={{ marginBottom: 16 }}>
@@ -572,7 +753,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
             </div>
 
             <Input label="Serial Number" value={form.serial} onChange={v => setF('serial', v)} />
-            <Input label="Asset Number" value={form.asset} onChange={v => setF('asset', v)} />
+            <Input label="Asset Tag" value={form.asset} onChange={v => setF('asset', v)} />
             <Input label="Barcode" value={form.barcode} onChange={v => setF('barcode', v)} />
 
             {/* Region — stores label + UUID */}
@@ -589,6 +770,27 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
 
             <Input label="Status" value={form.status} onChange={v => setF('status', v)} options={STATUS_LIST} />
             <Input label="Remarks" value={form.remarks} onChange={v => setF('remarks', v)} />
+          </div>
+
+          {/* Asset & Assignment Details Section */}
+          <div style={{ marginTop: 20, paddingTop: 18, borderTop: '2px solid #e5e7eb' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: '#eff6ff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <svg width={14} height={14} fill="none" stroke="#2563eb" strokeWidth={2} viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </div>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#111827' }}>Asset & Assignment Details</h4>
+              <span style={{ fontSize: 12, color: '#9ca3af', fontWeight: 400 }}>(optional)</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }}>
+              <Input label="Model" value={form.model} onChange={v => setF('model', v)} placeholder="e.g. Latitude 5540" />
+              <Input label="Purchase Date" value={form.purchase_date} onChange={v => setF('purchase_date', v)} type="date" />
+              <Input label="Purchase Price" value={form.purchase_price} onChange={v => setF('purchase_price', v)} type="number" placeholder="e.g. 55000" />
+              <Input label="Invoice Number" value={form.invoice_number} onChange={v => setF('invoice_number', v)} placeholder="e.g. INV-2026-001" />
+              <Input label="Warranty Expiry" value={form.warranty_expiry} onChange={v => setF('warranty_expiry', v)} type="date" />
+              <Input label="Assigned To" value={form.assigned_to} onChange={v => setForm(f => ({ ...f, assigned_to: v, engineer: v }))} options={ALL_ENGINEERS} placeholder="Select engineer…" />
+              <Input label="Assigned Since" value={form.assigned_since} onChange={v => setF('assigned_since', v)} type="date" />
+              <Input label="Next Maintenance Date" value={form.next_maintenance_date} onChange={v => setF('next_maintenance_date', v)} type="date" />
+            </div>
           </div>
 
           {/* Source Details Section */}
@@ -637,7 +839,7 @@ function InventoryTable({ inventory, setInventory, auditLog, setAuditLog, role, 
             </div>
           )}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 12 }}>
-            <Button variant="secondary" onClick={() => { setShowEdit(null); setSaveError('') }}>Cancel</Button>
+            <Button variant="secondary" onClick={() => { setShowEdit(null); setSaveError(''); setFieldErrors({}) }}>Cancel</Button>
             <Button onClick={handleEdit} disabled={saving} icon={saving ? null : <Icon name="check" size={14} />}>
               {saving ? 'Saving…' : 'Save Changes'}
             </Button>
@@ -1722,9 +1924,18 @@ function Miscellaneous({ items, setItems, activeCat, setActiveCat }) {
 
 function getStoredUser() {
   try {
+    const token = localStorage.getItem('accessToken')
     const raw = localStorage.getItem('currentUser')
-    return raw ? JSON.parse(raw) : null
+    // Only restore session if BOTH token AND user exist
+    if (!token || !raw) {
+      localStorage.removeItem('currentUser')
+      localStorage.removeItem('accessToken')
+      return null
+    }
+    return JSON.parse(raw)
   } catch {
+    localStorage.removeItem('currentUser')
+    localStorage.removeItem('accessToken')
     return null
   }
 }
