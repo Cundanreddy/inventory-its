@@ -29,12 +29,12 @@ const create = asyncHandler(async (req, res) => {
 
 // PATCH /api/users/:id  (admin edits name/role/department)
 const update = asyncHandler(async (req, res) => {
-  // Staff can only edit their own profile (no role change)
+  // engineer can only edit their own profile (no role change)
   if (req.user.role !== 'admin') {
     if (req.params.id !== req.user.id) {
       throw new AppError('You can only edit your own profile.', 403);
     }
-    // Strip role from body — staff cannot self-promote
+    // Strip role from body — engineer cannot self-promote
     delete req.body.role;
   }
 
@@ -72,8 +72,8 @@ const toggleActive = asyncHandler(async (req, res) => {
 
 // GET /api/users/:id/assets  (assets assigned to this user)
 const assignedAssets = asyncHandler(async (req, res) => {
-  // Staff can only view their own
-  if (req.user.role === 'staff' && req.params.id !== req.user.id) {
+  // engineer can only view their own
+  if (req.user.role === 'engineer' && req.params.id !== req.user.id) {
     throw new AppError('You can only view your own assigned assets.', 403);
   }
   const assets = await userService.getAssignedAssets(req.params.id);

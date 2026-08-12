@@ -13,9 +13,11 @@ const path        = require('path');
 const { errorHandler } = require('./middleware/errorHandler');
 
 // ── Routes ───────────────────────────────────────────────────
-const authRoutes  = require('./routes/auth');
-const assetRoutes = require('./routes/assets');
-const userRoutes  = require('./routes/users');
+const authRoutes      = require('./routes/auth');
+const assetRoutes     = require('./routes/assets');
+const userRoutes      = require('./routes/users');
+const categoryRoutes  = require('./routes/categories');
+const locationRoutes  = require('./routes/locations');
 
 // ── App & Server ─────────────────────────────────────────────
 const app    = express();
@@ -34,7 +36,7 @@ app.set('io', io);
 
 io.on('connection', (socket) => {
   const { role, userId } = socket.handshake.auth || {};
-  if (role === 'admin' || role === 'auditor') {
+  if (role === 'admin' || role === 'inventory manager') {
     socket.join('admins');
   }
   if (userId) {
@@ -90,9 +92,11 @@ if (process.env.NODE_ENV !== 'test') {
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ── API Routes ────────────────────────────────────────────────
-app.use('/api/auth',   authRoutes);
-app.use('/api/assets', assetRoutes);
-app.use('/api/users',  userRoutes);
+app.use('/api/auth',      authRoutes);
+app.use('/api/assets',    assetRoutes);
+app.use('/api/users',     userRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/locations',  locationRoutes);
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {

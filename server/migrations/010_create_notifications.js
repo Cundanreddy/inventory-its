@@ -16,9 +16,9 @@ exports.up = (knex) =>
       'warranty_expiry',
       'maintenance_due',
       'overdue_return',
-      'checkout_request',   // admin notified when staff requests
-      'checkout_approved',  // staff notified on approval
-      'checkout_rejected',  // staff notified on rejection
+      'checkout_request',   // admin notified when engineer requests
+      'checkout_approved',  // engineer notified on approval
+      'checkout_rejected',  // engineer notified on rejection
       'system',             // generic system message
     ]).notNullable();
 

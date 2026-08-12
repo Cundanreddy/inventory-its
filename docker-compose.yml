@@ -26,7 +26,11 @@ services:
       - redis_data:/data
 
   api:
-    build: ./server
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: development
     restart: unless-stopped
     env_file: ./server/.env
     ports:
@@ -36,13 +40,39 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    command: sh -c "npm run migrate && npm run seed && exec npm start"
+    command: sh -c "npm run migrate && npm run seed && exec npm run dev"
+    volumes:
+      - ./server:/server
+      - /server/node_modules
+    develop:
+      watch:
+        - action: rebuild
+          path: ./server
+          target: /server
+          ignore:
+            - node_modules/
+            - dist/
+            - .env
 
   client:
-    build: ./client
+    build:
+      context: ./client
+      dockerfile: Dockerfile.dev
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
+    develop:
+      watch:
+        - action: rebuild
+          path: ./client
+          target: /app
+          ignore:
+            - node_modules/
+            - dist/
 
   nginx:
     image: nginx:alpine
@@ -56,6 +86,14 @@ services:
     depends_on:
       - api
       - client
+    develop:
+      watch:
+        - action: sync
+          path: ./nginx
+          target: /etc/nginx
+        - action: sync
+          path: ./certs
+          target: /etc/nginx/certs
 
 volumes:
   pg_data:

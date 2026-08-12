@@ -6,13 +6,76 @@
 const bcrypt = require('bcryptjs');
 
 exports.seed = async (knex) => {
+  const upsertUser = async ({ name, email, password, role, department }) => {
+    const password_hash = await bcrypt.hash(password, 12);
+
+    await knex('users')
+      .insert({
+        id: knex.fn.uuid(),
+        name,
+        email,
+        password_hash,
+        role,
+        department,
+        is_active: true,
+        failed_login_attempts: 0,
+        locked_until: null,
+        created_at: knex.fn.now(),
+        updated_at: knex.fn.now(),
+      })
+      .onConflict('email')
+      .merge({
+        name,
+        password_hash,
+        role,
+        department,
+        is_active: true,
+        failed_login_attempts: 0,
+        locked_until: null,
+        updated_at: knex.fn.now(),
+      });
+  };
 
   // ── 1. Default admin user ────────────────────────────────────
-  const hash = await bcrypt.hash('Admin@1234', 12);
-  await knex('users').insert([
-    { id: knex.fn.uuid(), name: 'System Admin', email: 'admin@office.local',
-      password_hash: hash, role: 'admin', department: 'IT' },
-  ]).onConflict('email').ignore();
+  await upsertUser({
+    name: 'System Admin',
+    email: 'admin@office.local',
+    password: 'Admin@1234',
+    role: 'admin',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Arjun Mehta',
+    email: 'admin@p3acclivis.com',
+    password: 'admin123',
+    role: 'admin',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Priya Nair',
+    email: 'manager@p3acclivis.com',
+    password: 'manager123',
+    role: 'inventory manager',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Roshan Desai',
+    email: 'engineer@p3acclivis.com',
+    password: 'eng123',
+    role: 'engineer',
+    department: 'IT',
+  });
+
+  await upsertUser({
+    name: 'Sneha Pillai',
+    email: 'readonly@p3acclivis.com',
+    password: 'read123',
+    role: 'readonly',
+    department: 'IT',
+  });
 
   // ── 2. Categories ────────────────────────────────────────────
   const assetCats = [
@@ -25,26 +88,22 @@ exports.seed = async (knex) => {
   ];
 
   for (const name of assetCats) {
-    await knex('categories').insert({ id: knex.fn.uuid(), name, type: 'asset' })
-      .onConflict(['name', 'type']).ignore();
+    await knex('categories').insert({ id: knex.fn.uuid(), name })
+      .onConflict(['name']).ignore();
   }
   for (const name of consumableCats) {
-    await knex('categories').insert({ id: knex.fn.uuid(), name, type: 'consumable' })
-      .onConflict(['name', 'type']).ignore();
+    await knex('categories').insert({ id: knex.fn.uuid(), name })
+      .onConflict(['name']).ignore();
   }
 
   // ── 3. Locations ─────────────────────────────────────────────
   const locations = [
-    { building: 'Main Office', room: 'IT Storage Room' },
-    { building: 'Main Office', room: 'Conference Room A' },
-    { building: 'Main Office', room: 'Reception' },
-    { building: 'Main Office', room: 'Pantry' },
-    { building: 'Main Office', room: 'General Floor' },
-    { building: 'Branch Office', room: 'General Floor' },
+    { region: 'Bangalore' },
+    { region: 'Pune' },
   ];
   for (const loc of locations) {
     await knex('locations').insert({ id: knex.fn.uuid(), ...loc })
-      .onConflict(['building', 'room']).ignore();
+      .onConflict(['region']).ignore();
   }
 
   // ── 4. System settings defaults ──────────────────────────────

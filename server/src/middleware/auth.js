@@ -27,7 +27,7 @@ const authenticate = (req, res, next) => {
 
 /**
  * authorize(...roles)
- * Role guard factory. Usage: authorize('admin') or authorize('admin','auditor')
+ * Role guard factory. Usage: authorize('admin') or authorize('admin','inventory manager')
  * Must come AFTER authenticate in the middleware chain.
  */
 const authorize = (...roles) => (req, res, next) => {

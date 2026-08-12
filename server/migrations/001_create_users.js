@@ -9,7 +9,7 @@ exports.up = (knex) =>
     t.string('name', 100).notNullable();
     t.string('email', 150).notNullable().unique();
     t.string('password_hash', 255).notNullable();
-    t.enu('role', ['admin', 'staff', 'auditor']).notNullable().defaultTo('staff');
+    t.enu('role', ['admin', 'engineer', 'inventory manager', 'readonly']).notNullable().defaultTo('readonly');
     t.string('phone', 20).nullable();
     t.string('department', 100).nullable();
 

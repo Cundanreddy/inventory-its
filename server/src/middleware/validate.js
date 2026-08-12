@@ -63,7 +63,7 @@ const userCreateSchema = z.object({
                 .min(8, 'Password must be at least 8 characters')
                 .regex(/[A-Z]/, 'Must contain an uppercase letter')
                 .regex(/[0-9]/, 'Must contain a number'),
-  role:       z.enum(['admin','staff','auditor']).optional().default('staff'),
+  role:       z.enum(['admin','engineer','inventory manager','readonly']).optional().default('readonly'),
   phone:      z.string().max(20).optional().nullable(),
   department: z.string().max(100).optional().nullable(),
 });
@@ -72,7 +72,7 @@ const userUpdateSchema = z.object({
   name:       z.string().min(2).max(100).optional(),
   phone:      z.string().max(20).optional().nullable(),
   department: z.string().max(100).optional().nullable(),
-  role:       z.enum(['admin','staff','auditor']).optional(),
+  role:       z.enum(['admin','engineer','inventory manager','readonly']).optional(),
 });
 
 const passwordChangeSchema = z.object({
